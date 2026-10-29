@@ -4,6 +4,7 @@ use Mojo::Base 'Mojolicious', -signatures;
 use Mojo::mysql;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Lembas::Config;
+use Lembas::Model::Users;
 use Lembas::Telemetry;
 
 our $VERSION = '1.0.0';
@@ -28,6 +29,10 @@ has mysql => sub ($self) {
     return $mysql;
 };
 
+has users => sub ($self) {
+    return Lembas::Model::Users->new( mysql => $self->mysql, admin_emails => $self->config->{admin_emails} );
+};
+
 has telemetry => sub ($self) { Lembas::Telemetry->new( %{ $self->config->{telemetry} }, version => $VERSION ) };
 
 sub startup ($self) {
@@ -40,8 +45,17 @@ sub startup ($self) {
     $self->telemetry->register($self);
 
     push @{ $self->commands->namespaces }, 'Lembas::Command';
+    $self->_helpers;
     $self->_hooks;
     $self->_routes;
+    return;
+}
+
+# The models, for the controllers
+sub _helpers ($self) {
+    for my $model (qw(users)) {
+        $self->helper( $model => sub ($c) { $c->app->$model } );
+    }
     return;
 }
 
@@ -105,6 +119,10 @@ The Mojolicious application. The configuration comes from the environment (see L
 =head2 mysql
 
 The L<Mojo::mysql> connection to the database, with the migrations of F<migrations/lembas.sql>.
+
+=head2 users
+
+The L<Lembas::Model::Users> of the application, also the C<users> helper.
 
 =head2 telemetry
 

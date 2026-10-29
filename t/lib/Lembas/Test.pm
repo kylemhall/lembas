@@ -6,8 +6,10 @@ use Test::More;
 use Test::Mojo;
 use Mojo::mysql;
 use Mojo::URL;
+use Digest::SHA qw(sha256_hex);
+use Encode      qw(encode_utf8);
 
-our @EXPORT_OK = qw(capture_stdout reset_db test_app);
+our @EXPORT_OK = qw(capture_stdout create_link create_user reset_db test_app);
 
 # The environment of the test applications, with the database of the test process
 use constant TEST_ENV => {
@@ -21,6 +23,7 @@ use constant TEST_ENV => {
 };
 
 my ( $server, $database, $database_url, $created_by );
+my $sequence = 0;
 
 # Importing this module means the test needs a database: without one it is skipped, before Test::NoWarnings is loaded
 sub import ( $class, @names ) {
@@ -44,6 +47,26 @@ sub reset_db ($t) {
     $db->query('SET FOREIGN_KEY_CHECKS = 1');
     $t->reset_session;
     return;
+}
+
+# The fixtures are inserted as rows, not with the models: a bug in a model fails its own test, not every test
+sub create_user ( $t, %columns ) {
+    my $n  = ++$sequence;
+    my $db = $t->app->mysql->db;
+    my $id = $db->insert( users => { email => "user$n\@example.org", name => "User $n", %columns } )->last_insert_id;
+    return $db->select( users => '*', { id => $id } )->hash;
+}
+
+sub create_link ( $t, %columns ) {
+    my $n  = ++$sequence;
+    my $db = $t->app->mysql->db;
+    $columns{user_id} = create_user($t)->{id} unless exists $columns{user_id};
+    my $long_url = $columns{long_url} // "https://example.org/$n";
+    my $id =
+        $db->insert( links =>
+            { ending => "e$n", long_url => $long_url, long_url_hash => sha256_hex( encode_utf8($long_url) ), %columns }
+        )->last_insert_id;
+    return $db->select( links => '*', { id => $id } )->hash;
 }
 
 sub capture_stdout ($code) {
@@ -100,6 +123,14 @@ A L<Test::Mojo> for a new Lembas application, the given variables added to its e
 =head2 reset_db
 
 Empties every table and forgets the session cookie.
+
+=head2 create_user
+
+Inserts a user, the given columns over the defaults, and returns its row.
+
+=head2 create_link
+
+Inserts a link, for a new user unless C<user_id> is given, and returns its row.
 
 =head2 capture_stdout
 

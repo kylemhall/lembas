@@ -1,6 +1,6 @@
 use Mojo::Base -strict, -signatures;
 
-use Test::More tests => 5;
+use Test::More tests => 6;
 use Test::NoWarnings;
 use Mojo::Server;
 use Test::Mojo;
@@ -45,4 +45,11 @@ subtest 'database' => sub {
     is( $mysql->dsn,              'dbi:MariaDB:dbname=lembas;host=db', 'the database of LEMBAS_DB_URL' );
     is( $mysql->password,         'db-password',                       'the password of LEMBAS_DB_PASSWORD' );
     is( $mysql->migrations->name, 'lembas',                            'the migrations of Lembas' );
+};
+
+subtest 'helpers' => sub {
+    plan tests => 1;
+    my $t = Test::Mojo->new( Lembas => { env => \%env } );
+    my $c = $t->app->build_controller;
+    isa_ok( $c->users, 'Lembas::Model::Users', 'users' );
 };
