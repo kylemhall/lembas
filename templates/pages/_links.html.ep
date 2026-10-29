@@ -1,0 +1,57 @@
+<section x-data="linkList" data-all="<%= $all %>" x-on:lembas:link-created.window="load">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h2 class="h5 mb-0"><%= $heading %></h2>
+        <form class="ms-auto" role="search" x-on:submit.prevent="search">
+            <input class="form-control form-control-sm" type="search" placeholder="Search" aria-label="Search" x-model="q">
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Short link</th>
+                    <th>Long URL</th>
+                    <th x-show="all">Creator</th>
+                    <th class="text-end">Clicks</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="link in links" :key="link.ending">
+                    <tr :class="link.is_disabled ? 'text-body-tertiary' : ''">
+                        <td class="text-nowrap">
+                            <a :href="link.short_url" x-text="link.ending"></a>
+                            <span class="badge text-bg-secondary" x-show="link.is_disabled">disabled</span>
+                        </td>
+                        <td class="long-url">
+                            <span class="text-break" x-show="editing !== link.ending" x-text="link.long_url"></span>
+                            <form class="d-flex gap-1" x-show.important="editing === link.ending" x-on:submit.prevent="saveEdit">
+                                <input class="form-control form-control-sm" type="url" required aria-label="Long URL" x-model="editUrl">
+                                <button class="btn btn-sm btn-primary">Save</button>
+                                <button class="btn btn-sm btn-link" type="button" x-on:click="cancelEdit">Cancel</button>
+                            </form>
+                        </td>
+                        <td x-show="all" x-text="link.creator_email"></td>
+                        <td class="text-end" x-text="link.clicks"></td>
+                        <td class="text-nowrap" x-text="link.created_at.substring(0, 10)"></td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" :href="'/links/' + link.ending">Stats</a>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" x-on:click="copy(link)">Copy</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" x-on:click="startEdit(link)">Edit</button>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" x-on:click="toggle(link)"
+                                x-text="link.is_disabled ? 'Enable' : 'Disable'"></button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" x-on:click="remove(link)">Delete</button>
+                        </td>
+                    </tr>
+                </template>
+            </tbody>
+        </table>
+    </div>
+    <p class="text-body-secondary" x-cloak x-show="empty">No links yet.</p>
+    <nav class="d-flex justify-content-between align-items-center" x-cloak x-show.important="pages > 1">
+        <button class="btn btn-sm btn-outline-secondary" type="button" x-on:click="prev" :disabled="page <= 1">Previous</button>
+        <span class="text-body-secondary" x-text="'Page ' + page + ' of ' + pages"></span>
+        <button class="btn btn-sm btn-outline-secondary" type="button" x-on:click="next" :disabled="page >= pages">Next</button>
+    </nav>
+</section>

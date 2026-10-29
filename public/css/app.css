@@ -1,0 +1,7 @@
+[x-cloak] {
+    display: none !important;
+}
+
+.long-url {
+    max-width: 32rem;
+}

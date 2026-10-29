@@ -55,7 +55,7 @@ subtest 'every route is reserved' => sub {
     my @segments = map { $_->basename } path('public')->list( { dir => 1 } )->each;
     my @routes   = @{ $app->routes->children };
     while ( my $route = shift @routes ) {
-        my ($segment) = $route->pattern->unparsed =~ m{\A/([^/:*<]+)};
+        my ($segment) = ( $route->pattern->unparsed // q{} ) =~ m{\A/([^/:*<]+)};
         if ( defined $segment ) {
             push @segments, $segment;
         } else {

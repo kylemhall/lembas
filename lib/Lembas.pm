@@ -171,6 +171,7 @@ sub _hooks ($self) {
 
 sub _routes ($self) {
     my $r = $self->routes;
+    $r->get('/')->to('pages#home')->name('home');
     $r->get('/health')->to('health#health')->name('health');
     $r->get('/ready')->to('health#ready')->name('ready');
 

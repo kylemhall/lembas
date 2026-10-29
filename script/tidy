@@ -15,7 +15,7 @@ my @files =
     path('lib')->list_tree->grep(qr/\.pm\z/)->each,
     path('t')->list_tree->grep(qr/\.(?:pm|t)\z/)->each,
     path('script')->list->grep( sub { $_->slurp =~ /\A#!.*perl/ } )->each,
-    map { path( 'public', $_ )->list_tree->grep(qr/\.(?:css|js)\z/)->each } qw(css js),
+    map { path($_)->list_tree->grep(qr/\.(?:css|js)\z/)->each } qw(public/css public/js t/js),
     );
 my @web  = grep { /\.(?:css|js)\z/ } @files;
 my @perl = grep { !/\.(?:css|js)\z/ } @files;
@@ -52,6 +52,6 @@ script/tidy - Format the code of Lembas
 =head1 DESCRIPTION
 
 Perl files in lib, t and script are formatted with perltidy and .perltidyrc, the CSS and JavaScript files of
-public/css and public/js with prettier and .prettierrc.js. public/vendor is never touched.
+public/css, public/js and t/js with prettier and .prettierrc.js. public/vendor is never touched.
 
 =cut

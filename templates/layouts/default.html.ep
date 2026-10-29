@@ -4,10 +4,37 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title><%= title %> - <%= config 'site_name' %></title>
+        <link rel="icon" href="data:,">
+        <link rel="stylesheet" href="/vendor/bootstrap-5.3.8/bootstrap.min.css">
+        <link rel="stylesheet" href="/css/app.css">
+        <script src="/js/app.js" defer></script>
+        <script src="/vendor/alpinejs-csp-3.17.5/cdn.min.js" defer></script>
     </head>
     <body>
-        <main class="container py-4">
+        <nav class="navbar bg-body-tertiary border-bottom mb-4">
+            <div class="container">
+                <a class="navbar-brand fw-semibold" href="/"><%= config 'site_name' %></a>
+                % if ( my $user = stash 'user' ) {
+                    <div class="d-flex align-items-center gap-3">
+                        % if ( $user->{is_admin} ) {
+                            <a class="link-secondary" href="/admin">Admin</a>
+                        % }
+                        <span class="text-body-secondary"><%= $user->{name} || $user->{email} %></span>
+                        <form method="post" action="<%= url_for 'logout' %>">
+                            %= csrf_field
+                            <button class="btn btn-sm btn-outline-secondary">Sign out</button>
+                        </form>
+                    </div>
+                % }
+            </div>
+        </nav>
+        <main class="container pb-5">
             <%= content %>
         </main>
+        <div x-data class="position-fixed bottom-0 end-0 p-3" aria-live="polite">
+            <div class="alert shadow mb-0" x-cloak x-show="$store.toast.message"
+                :class="$store.toast.kind === 'error' ? 'alert-danger' : 'alert-success'"
+                x-text="$store.toast.message"></div>
+        </div>
     </body>
 </html>

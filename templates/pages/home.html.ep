@@ -1,0 +1,18 @@
+% layout 'default';
+% title 'Short links';
+% if ( my $user = stash 'user' ) {
+    %= include 'pages/_shortener'
+    %= include 'pages/_links', heading => 'Your links', all => 0
+% } else {
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body p-4 text-center">
+                    <h1 class="h3 mb-3"><%= config 'site_name' %></h1>
+                    <p class="text-body-secondary">The short links of <%= config 'allowed_domain' %>.</p>
+                    <a class="btn btn-primary btn-lg" href="<%= url_for 'login' %>">Sign in with Google</a>
+                </div>
+            </div>
+        </div>
+    </div>
+% }

@@ -1,0 +1,25 @@
+<section x-data="shortener" class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form class="row g-2" x-on:submit.prevent="submit">
+            <div class="col-md-7">
+                <label class="visually-hidden" for="long-url">Long URL</label>
+                <input id="long-url" class="form-control form-control-lg" type="url" required
+                    placeholder="https://..." x-model="longUrl">
+            </div>
+            <div class="col-md-3">
+                <label class="visually-hidden" for="ending">Custom ending</label>
+                <input id="ending" class="form-control form-control-lg" pattern="[A-Za-z0-9_\-]{1,64}"
+                    placeholder="Custom ending (optional)" x-model="ending">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button class="btn btn-primary btn-lg" :disabled="busy">Shorten</button>
+            </div>
+        </form>
+        <div class="d-flex flex-wrap align-items-center gap-2 mt-3" x-cloak x-show.important="result">
+            <a class="fs-5 fw-semibold" :href="result ? result.short_url : ''" x-text="result ? result.short_url : ''"></a>
+            <button class="btn btn-sm btn-outline-primary" type="button" x-on:click="copy">Copy</button>
+            <span class="text-body-secondary" x-text="note"></span>
+        </div>
+        <div class="alert alert-danger mt-3 mb-0" x-cloak x-show="error" x-text="error"></div>
+    </div>
+</section>
