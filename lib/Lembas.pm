@@ -57,6 +57,7 @@ sub startup ($self) {
     my $config = Lembas::Config->from_env( $self->config->{config_override} ? $self->config->{env} : \%ENV );
     $self->config($config);
     $self->secrets( $config->{secrets} );
+    $self->_sessions;
     $self->log->level( $config->{log_level} );
     $self->telemetry->register($self);
 
@@ -67,11 +68,34 @@ sub startup ($self) {
     return;
 }
 
-# The models, for the controllers
+# Lax, not Strict: the browser must send the cookie when the sign-in service redirects back to Lembas
+sub _sessions ($self) {
+    my $config   = $self->config;
+    my $sessions = $self->sessions;
+    $sessions->cookie_name('lembas');
+    $sessions->samesite('Lax');
+    $sessions->secure( scalar $config->{base_url} =~ /\Ahttps:/ );
+    $sessions->default_expiration( $config->{session_days} * 86_400 );
+    return;
+}
+
 sub _helpers ($self) {
+
+    # The models, for the controllers
     for my $model (qw(api_keys clicks links users)) {
         $self->helper( $model => sub ($c) { $c->app->$model } );
     }
+
+    # The signed-in user, while their account exists and is active
+    $self->helper(
+        current_user => sub ($c) {
+            my $user_id = $c->session('user_id') or return;
+            my $user    = $c->users->find($user_id);
+            return $user if $user && $user->{is_active};
+            delete $c->session->{user_id};
+            return;
+        }
+    );
     return;
 }
 
@@ -115,6 +139,27 @@ sub _routes ($self) {
     my $r = $self->routes;
     $r->get('/health')->to('health#health')->name('health');
     $r->get('/ready')->to('health#ready')->name('ready');
+
+    $self->plugin(
+        OpenAPI => {
+            url                    => $self->home->child( 'api', 'lembas.yaml' )->to_string,
+            default_response_name  => 'DefaultResponse',
+            default_response_codes => [ 400, 401, 403, 404, 409, 500, 501 ],
+            security               => {
+                apiKey => sub ( $c, $, $, $callback ) {
+                    my $user_id = $c->api_keys->authenticate( $c->req->headers->header('X-Api-Key') // q{} )
+                        or return $c->$callback('Invalid or missing API key');
+                    $c->stash( user => $c->users->find($user_id), 'lembas.api_key' => 1 );
+                    return $c->$callback;
+                },
+                session => sub ( $c, $, $, $callback ) {
+                    my $user = $c->current_user or return $c->$callback('Not signed in');
+                    $c->stash( user => $user );
+                    return $c->$callback;
+                },
+            },
+        }
+    );
     return;
 }
 

@@ -9,7 +9,7 @@ use Mojo::URL;
 use Digest::SHA qw(sha256_hex);
 use Encode      qw(encode_utf8);
 
-our @EXPORT_OK = qw(capture_stdout create_click create_link create_user reset_db test_app);
+our @EXPORT_OK = qw(capture_stdout create_click create_link create_user login_as reset_db test_app);
 
 # The environment of the test applications, with the database of the test process
 use constant TEST_ENV => {
@@ -37,6 +37,19 @@ sub test_app (%env) {
     state $migrated = 0;
     my $t = Test::Mojo->new( Lembas => { env => { %{ TEST_ENV() }, LEMBAS_DB_URL => _database_url(), %env } } );
     $t->app->mysql->migrations->migrate unless $migrated++;
+
+    # Signs in without the sign-in service, through the real session cookie (see login_as)
+    $t->app->routes->get(
+        '/_test/login/:id' => sub ($c) {
+            $c->session( user_id => $c->param('id') );
+            return $c->render( text => 'signed in' );
+        }
+    );
+    return $t;
+}
+
+sub login_as ( $t, $user ) {
+    $t->get_ok("/_test/login/$user->{id}")->status_is(200);
     return $t;
 }
 
@@ -126,6 +139,10 @@ database of its own, migrated to the latest version and dropped at the end.
 =head2 test_app
 
 A L<Test::Mojo> for a new Lembas application, the given variables added to its environment.
+
+=head2 login_as
+
+Signs the user in: the next requests of the L<Test::Mojo> carry their session cookie. Two tests.
 
 =head2 reset_db
 
