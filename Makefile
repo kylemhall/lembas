@@ -6,7 +6,7 @@ CHECK   := $(COMPOSE) run --rm --no-deps test
 JOBS    ?= 4
 IMAGE   ?= lembas:local
 
-.PHONY: help all test coverage cover lint critic tidy-check format dev migrate build shell clean
+.PHONY: help all test coverage cover lint critic tidy-check format dev dev-otel migrate build shell clean
 
 help: ## Show this help (default)
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-11s %s\n", $$1, $$2}'
@@ -35,6 +35,9 @@ format: ## Format the code with perltidy and prettier (writes the files)
 dev: ## Run morbo on http://localhost:8080 with MariaDB (settings from .env)
 	$(COMPOSE) --profile dev up --build
 
+dev-otel: ## Same as dev, with OpenTelemetry: a collector, and Jaeger on http://localhost:16686
+	OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 $(COMPOSE) --profile dev --profile otel up --build
+
 migrate: ## Apply the migrations to the development database
 	$(COMPOSE) --profile dev run --rm dev script/lembas migrate
 
@@ -46,4 +49,4 @@ shell: ## Open a shell in the test image
 
 clean: ## Remove cover_db and every compose container and volume, the database included
 	rm -rf cover_db
-	$(COMPOSE) --profile dev --profile test down -v --remove-orphans
+	$(COMPOSE) --profile dev --profile test --profile otel down -v --remove-orphans

@@ -1,6 +1,7 @@
 # Lembas development and tests. The host needs only Docker, see the Makefile:
 #   make test    the suite, in the test image, against the mariadb service
 #   make dev     morbo on http://localhost:8080 (cp .env.example .env first)
+#   make dev-otel the same with OpenTelemetry: a collector, and Jaeger on http://localhost:16686
 x-lembas-env: &lembas-env
     LEMBAS_BASE_URL: ${LEMBAS_BASE_URL:-http://localhost:8080}
     LEMBAS_SHORT_URL: ${LEMBAS_SHORT_URL:-}
@@ -12,6 +13,9 @@ x-lembas-env: &lembas-env
     LEMBAS_ALLOWED_DOMAIN: ${LEMBAS_ALLOWED_DOMAIN:-bywatersolutions.com}
     LEMBAS_ADMIN_EMAILS: ${LEMBAS_ADMIN_EMAILS:-}
     LEMBAS_LOG_LEVEL: ${LEMBAS_LOG_LEVEL:-debug}
+    # Empty: no telemetry. make dev-otel sets http://otel-collector:4318
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    OTEL_BSP_SCHEDULE_DELAY: ${OTEL_BSP_SCHEDULE_DELAY:-1000}
 
 services:
     mariadb:
@@ -65,5 +69,24 @@ services:
             - .:/app
         command: ["morbo", "--listen", "http://*:8080", "--watch", "lib", "--watch", "templates", "--watch", "api", "script/lembas"]
 
+    otel-collector:
+        image: otel/opentelemetry-collector-contrib:0.161.0
+        profiles: [otel]
+        # Root: the collector writes to the otel-out volume
+        user: "0:0"
+        command: ["--config=/etc/otelcol/config.yaml"]
+        volumes:
+            - ./deploy/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro
+            - otel-out:/out
+        depends_on:
+            - jaeger
+
+    jaeger:
+        image: jaegertracing/jaeger:2.21.0
+        profiles: [otel]
+        ports:
+            - "16686:16686"
+
 volumes:
     mariadb-data:
+    otel-out:

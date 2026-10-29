@@ -13,7 +13,6 @@ rm -rf cover_db
 HARNESS_PERL_SWITCHES="-MDevel::Cover=-db,cover_db,-coverage,$criteria,+ignore,^t/,+ignore,^script/,-silent,1" \
     prove -r -j"${JOBS:-4}" $(find t -name '*.t' ! -name critic.t ! -name tidy.t ! -name pod.t | sort)
 
-cover -silent -report compilation -select_re '^lib/' -coverage "$criteria" cover_db
 cover -silent -report json -select_re '^lib/' -coverage "$criteria" cover_db >/dev/null
 
 printf 'Uncoverable annotations in lib/: %s\n' "$(grep -rho '# uncoverable' lib | wc -l | tr -d ' ')"
@@ -24,6 +23,10 @@ perl -MJSON::PP -e '
     my @missing  = grep { ( $total->{$_}{percentage} // 100 ) < 100 } @criteria;
     printf "Coverage of lib/: %s\n", join ", ", map { sprintf "%s %.2f%%", $_, $total->{$_}{percentage} // 100 } @criteria;
     exit 0 unless @missing;
-    print STDERR "FAIL: lib/ is not 100% covered for @missing (the uncovered lines are listed above)\n";
+    print STDERR "FAIL: lib/ is not 100% covered for @missing\n";
     exit 1;
-'
+' && exit 0
+
+# The summary and every uncovered point (annotated ones are listed too, but they do not count)
+cover -silent -report compilation -select_re '^lib/' -coverage "$criteria" cover_db
+exit 1

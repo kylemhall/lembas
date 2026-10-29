@@ -34,6 +34,9 @@ COPY . .
 RUN useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin lembas
 USER lembas
 
+# docker stop: prefork finishes the requests and workers export their telemetry on SIGQUIT, SIGTERM kills them
+STOPSIGNAL SIGQUIT
+
 ARG VERSION=dev
 ENV MOJO_MODE=production MOJO_REVERSE_PROXY=1 LEMBAS_BUILD_VERSION=${VERSION}
 EXPOSE 8080

@@ -1,0 +1,39 @@
+# The OpenTelemetry collector of the development and smoke-test stacks (compose profile "otel"). It prints what Lembas
+# sends (docker compose logs otel-collector), writes it to /out/telemetry.json for script/smoke, and sends the traces to
+# Jaeger (http://localhost:16686). The starting point for the collector in front of Elastic: replace the exporters.
+receivers:
+    otlp:
+        protocols:
+            http:
+                endpoint: 0.0.0.0:4318
+
+processors:
+    batch: {}
+    # A second line of defence: Lembas records neither (query strings carry Polr API keys and sign-in codes)
+    attributes/redact:
+        actions:
+            - key: url.query
+              action: delete
+            - key: client.address
+              action: delete
+
+exporters:
+    debug:
+        verbosity: basic
+    file:
+        path: /out/telemetry.json
+    otlp/jaeger:
+        endpoint: jaeger:4317
+        tls:
+            insecure: true
+
+service:
+    pipelines:
+        traces:
+            receivers: [otlp]
+            processors: [attributes/redact, batch]
+            exporters: [debug, file, otlp/jaeger]
+        logs:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [debug, file]

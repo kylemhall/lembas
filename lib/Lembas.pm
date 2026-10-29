@@ -4,6 +4,7 @@ use Mojo::Base 'Mojolicious', -signatures;
 use Mojo::mysql;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Lembas::Config;
+use Lembas::Telemetry;
 
 our $VERSION = '1.0.0';
 
@@ -27,6 +28,8 @@ has mysql => sub ($self) {
     return $mysql;
 };
 
+has telemetry => sub ($self) { Lembas::Telemetry->new( %{ $self->config->{telemetry} }, version => $VERSION ) };
+
 sub startup ($self) {
 
     # Test::Mojo->new( Lembas => { env => {...} } ) gives the environment of the tests
@@ -34,6 +37,7 @@ sub startup ($self) {
     $self->config($config);
     $self->secrets( $config->{secrets} );
     $self->log->level( $config->{log_level} );
+    $self->telemetry->register($self);
 
     push @{ $self->commands->namespaces }, 'Lembas::Command';
     $self->_hooks;
@@ -101,6 +105,10 @@ The Mojolicious application. The configuration comes from the environment (see L
 =head2 mysql
 
 The L<Mojo::mysql> connection to the database, with the migrations of F<migrations/lembas.sql>.
+
+=head2 telemetry
+
+The L<Lembas::Telemetry> of the application.
 
 =head2 startup
 
