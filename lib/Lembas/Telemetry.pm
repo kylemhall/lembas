@@ -118,7 +118,7 @@ sub _trace ( $self, $next, $c ) {
     return $next->() if $path =~ $untraced;
     $self->ensure_started;
 
-    # No query (Polr API keys and sign-in codes travel in it) and no client address: neither is recorded
+    # No query (Polr API keys and sign-in codes travel in it), no client address, no email: none is recorded
     my $headers = $req->headers;
     my $agent   = $headers->user_agent;
     my $url     = $req->url->to_abs;
@@ -152,6 +152,9 @@ sub _end ( $self, $c ) {
     my $span   = delete $c->stash->{'lembas.span'} or return;
     my $status = $c->res->code;
     $span->set_attribute( 'http.response.status_code' => $status );
+    if ( my $user = $c->stash('user') ) {
+        $span->set_attribute( 'user.id' => $user->{id} );
+    }
     $span->set_status( SPAN_STATUS_ERROR, $c->stash('lembas.error') ) if $status >= 500;
     $span->end;
     return;

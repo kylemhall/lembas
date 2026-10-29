@@ -1,7 +1,7 @@
 use Mojo::Base -strict, -signatures;
 
 use Test::More;
-use Lembas::Test qw(test_app);
+use Lembas::Test qw(create_user login_as test_app);
 use Test::NoWarnings;
 use OpenTelemetry;
 use OpenTelemetry::Constants qw(SPAN_KIND_CLIENT SPAN_KIND_SERVER);
@@ -13,7 +13,7 @@ use Mojolicious;
 use Lembas::Telemetry;
 use Lembas::Test::Telemetry qw(log_records spans start_in_memory);
 
-plan tests => 15;
+plan tests => 16;
 
 sub server_span () {
     my @spans = grep { $_->kind == SPAN_KIND_SERVER } @{ spans() };
@@ -83,6 +83,18 @@ subtest 'server spans' => sub {
     ok( !exists $attributes->{'client.address'}, 'no client address' );
     unlike( join( q{ }, values %$attributes ), qr/secret-api-key|203\.0\.113\.9/, 'neither appears anywhere' );
     ok( $span->status->is_unset, 'not an error' );
+};
+
+subtest 'the user' => sub {
+    plan tests => 7;
+    my $user = create_user($t);
+    login_as( $t, $user );
+    spans();
+    $t->get_ok('/api/v1/me')->status_is(200);
+    is( server_span()->attributes->{'user.id'}, $user->{id}, 'the id of the user, never their email' );
+    $t->reset_session;
+    $t->get_ok('/_test/links/abc');
+    ok( !exists server_span()->attributes->{'user.id'}, 'nobody signed in' );
 };
 
 subtest 'the root' => sub {

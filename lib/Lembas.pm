@@ -195,6 +195,10 @@ sub _routes ($self) {
         }
     );
 
+    $r->get('/auth/login')->to('auth#login')->name('login');
+    $r->get('/auth/callback')->to('auth#callback')->name('auth_callback');
+    $r->post('/auth/logout')->to('auth#logout')->name('logout');
+
     # Last: every other route comes first
     $r->get( '/:ending' => [ ending => qr/[A-Za-z0-9_-]{1,64}/ ] )->to('redirect#go')->name('redirect');
     return;
