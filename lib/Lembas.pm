@@ -174,6 +174,10 @@ sub _routes ($self) {
     $r->get('/health')->to('health#health')->name('health');
     $r->get('/ready')->to('health#ready')->name('ready');
 
+    # The API of Polr, for the scripts that use it: before the OpenAPI routes
+    $r->any( [qw(GET POST)] => '/api/v2/action/shorten' )->to('polr_v2#shorten')->name('polr_shorten');
+    $r->any( [qw(GET POST)] => '/api/v2/action/lookup' )->to('polr_v2#lookup')->name('polr_lookup');
+
     $self->plugin(
         OpenAPI => {
             url                    => $self->home->child( 'api', 'lembas.yaml' )->to_string,
