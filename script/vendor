@@ -1,0 +1,28 @@
+#!/bin/sh
+# Downloads the files of public/vendor again, at the versions and with the checksums of public/vendor/README.md.
+# To upgrade: change the version and the checksum here and in the README, then run it.
+set -eu
+cd "$(dirname "$0")/../public/vendor"
+
+sha256() {
+    if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d ' ' -f 1
+}
+
+fetch() {
+    url=$1 file=$2 expected=$3
+    mkdir -p "$(dirname "$file")"
+    curl -fsSL "$url" -o "$file.download"
+    actual=$(sha256 "$file.download")
+    if [ "$actual" != "$expected" ]; then
+        rm -f "$file.download"
+        echo "Wrong checksum for $url: $actual" >&2
+        exit 1
+    fi
+    mv "$file.download" "$file"
+    echo "$file"
+}
+
+fetch https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.17.5/dist/cdn.min.js \
+    alpinejs-csp-3.17.5/cdn.min.js 48c170c92032e527cbae71b8ce75cf1f96ca06fa869a6120ef0fe438d8e92c36
+fetch https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css \
+    bootstrap-5.3.8/bootstrap.min.css d85327d99c7a3ee1f9b5d0500d1370acea3ad2db39c163c2f51f232baedbdede
