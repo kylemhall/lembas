@@ -9,9 +9,10 @@ cd "$(dirname "$0")/.."
 criteria=statement,branch,condition,subroutine
 rm -rf cover_db
 
-# critic, tidy and pod never load lib/ and are the slowest files
+# critic, tidy and pod never load lib/ and are the slowest files. One test at a time: parallel runs can lose the
+# coverage of a file when they write its structure at the same time
 HARNESS_PERL_SWITCHES="-MDevel::Cover=-db,cover_db,-coverage,$criteria,+ignore,^t/,+ignore,^script/,-silent,1" \
-    prove -r -j"${JOBS:-4}" $(find t -name '*.t' ! -name critic.t ! -name tidy.t ! -name pod.t | sort)
+    prove -r $(find t -name '*.t' ! -name critic.t ! -name tidy.t ! -name pod.t | sort)
 
 cover -silent -report json -select_re '^lib/' -coverage "$criteria" cover_db >/dev/null
 
