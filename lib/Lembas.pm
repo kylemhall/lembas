@@ -2,9 +2,19 @@ package Lembas;
 use Mojo::Base 'Mojolicious', -signatures;
 
 use Mojo::mysql;
+use Time::HiRes qw(gettimeofday tv_interval);
 use Lembas::Config;
 
 our $VERSION = '1.0.0';
+
+use constant CSP => join '; ', "default-src 'self'", "img-src 'self' data:", "style-src 'self'", "script-src 'self'",
+    "frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'";
+
+# Request ids from upstream proxies are kept when they look like one
+use constant REQUEST_ID => qr/\A[\w.-]{1,64}\z/a;
+
+# The probes of Docker and the swarm, every few seconds: logged at the debug level
+use constant PROBES => qr{\A/(?:health|ready)\z};
 
 has mysql => sub ($self) {
     my $config = $self->config;
@@ -26,6 +36,51 @@ sub startup ($self) {
     $self->log->level( $config->{log_level} );
 
     push @{ $self->commands->namespaces }, 'Lembas::Command';
+    $self->_hooks;
+    $self->_routes;
+    return;
+}
+
+sub _hooks ($self) {
+    $self->hook(
+        before_dispatch => sub ($c) {
+            my $req = $c->req;
+            my $id  = $req->headers->header('X-Request-ID');
+            $req->request_id($id) if defined $id && $id =~ REQUEST_ID;
+            $c->stash( 'lembas.started' => [gettimeofday] );
+        }
+    );
+
+    $self->hook(
+        after_dispatch => sub ($c) {
+            my ( $req, $res ) = ( $c->req, $c->res );
+            my $headers = $res->headers;
+            $headers->header( 'X-Request-ID'              => $req->request_id );
+            $headers->header( 'X-Content-Type-Options'    => 'nosniff' );
+            $headers->header( 'X-Frame-Options'           => 'DENY' );
+            $headers->header( 'Referrer-Policy'           => 'same-origin' );
+            $headers->header( 'Content-Security-Policy'   => CSP );
+            $headers->header( 'Strict-Transport-Security' => 'max-age=31536000' ) if $req->is_secure;
+
+            # Static files are revalidated with their ETag, the rest is never stored
+            $headers->cache_control( $c->stash('mojo.static') ? 'no-cache' : 'private, no-store' );
+
+            my $path  = $req->url->path->to_string;
+            my $level = $path =~ PROBES ? 'debug' : 'info';
+            $c->app->log->$level(
+                sprintf '%s %s %s %.1fms id=%s',
+                $req->method, $path, $res->code, 1000 * tv_interval( $c->stash('lembas.started') ),
+                $req->request_id
+            );
+        }
+    );
+    return;
+}
+
+sub _routes ($self) {
+    my $r = $self->routes;
+    $r->get('/health')->to('health#health')->name('health');
+    $r->get('/ready')->to('health#ready')->name('ready');
     return;
 }
 
