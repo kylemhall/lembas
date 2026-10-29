@@ -316,12 +316,48 @@ function apiKeys() {
     };
 }
 
+function adminUsers() {
+    return {
+        users: [],
+        init() {
+            return this.load();
+        },
+        async load() {
+            try {
+                const { data } = await api("GET", "/admin/users");
+                this.users = data.users;
+            } catch (error) {
+                notify(error.message, "error");
+            }
+        },
+        async toggle(user) {
+            try {
+                const { data } = await api("PATCH", "/admin/users/" + user.id, {
+                    is_active: !user.is_active,
+                });
+
+                // The count of links is only in the list
+                this.users = this.users.map(other =>
+                    other.id === user.id ? { ...other, ...data } : other
+                );
+                notify(
+                    (data.is_active ? "Enabled " : "Disabled ") + data.email,
+                    "success"
+                );
+            } catch (error) {
+                notify(error.message, "error");
+            }
+        },
+    };
+}
+
 function register(alpine) {
     alpine.store("toast", toastStore);
     alpine.data("shortener", shortener);
     alpine.data("linkList", linkList);
     alpine.data("linkStats", linkStats);
     alpine.data("apiKeys", apiKeys);
+    alpine.data("adminUsers", adminUsers);
 }
 
 globalThis.Lembas = {
@@ -333,6 +369,7 @@ globalThis.Lembas = {
     linkList,
     linkStats,
     apiKeys,
+    adminUsers,
     register,
 };
 document.addEventListener("alpine:init", () => register(window.Alpine));

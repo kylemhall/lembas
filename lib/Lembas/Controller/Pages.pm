@@ -13,6 +13,14 @@ sub require_user ($c) {
     return;
 }
 
+sub require_admin ($c) {
+    return 1 if $c->stash('user')->{is_admin};
+    $c->render( 'pages/forbidden', status => 403 );
+    return;
+}
+
+sub admin ($c) { return $c->render('pages/admin') }
+
 sub link_stats ($c) { return $c->render( 'pages/link', ending => $c->stash('ending') ) }
 
 1;
@@ -28,6 +36,14 @@ C</>: the shortener and the links of the user, or the sign-in button.
 =head2 require_user
 
 Lets signed-in users through, sends the others to the sign-in.
+
+=head2 require_admin
+
+Lets admins through, tells the others the page is not for them.
+
+=head2 admin
+
+C</admin>: every user and every link.
 
 =head2 link_stats
 

@@ -24,6 +24,7 @@ describe("register", () => {
         assert.equal(browser.components.linkList, linkList);
         assert.equal(browser.components.linkStats, browser.Lembas.linkStats);
         assert.equal(browser.components.apiKeys, browser.Lembas.apiKeys);
+        assert.equal(browser.components.adminUsers, browser.Lembas.adminUsers);
     });
 });
 

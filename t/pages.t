@@ -4,7 +4,7 @@ use Test::More;
 use Lembas::Test qw(create_user login_as reset_db test_app);
 use Test::NoWarnings;
 
-plan tests => 6;
+plan tests => 7;
 
 my $t = test_app( LEMBAS_ADMIN_EMAILS => 'admin@example.org' );
 
@@ -58,6 +58,20 @@ subtest 'stats of a link' => sub {
     login_as( $t, create_user($t) );
     $t->get_ok('/links/abc')->status_is(200)->element_exists('section[x-data="linkStats"][data-ending="abc"]');
     csp_clean( $t, 'the stats page' );
+};
+
+subtest 'admin' => sub {
+    plan tests => 17;
+    reset_db($t);
+    $t->get_ok('/admin')->status_is(302)->header_is( Location => '/auth/login?return_to=%2Fadmin' );
+    login_as( $t, create_user($t) );
+    $t->get_ok('/admin')->status_is(403)->text_is( h1 => 'Admins only' );
+    login_as( $t, create_user( $t, email => 'admin@example.org' ) );
+    $t->get_ok('/admin')
+        ->status_is(200)
+        ->element_exists( 'section[x-data="adminUsers"]',             'the users' )
+        ->element_exists( 'section[x-data="linkList"][data-all="1"]', 'and every link' );
+    csp_clean( $t, 'the admin page' );
 };
 
 subtest 'scripts and styles' => sub {

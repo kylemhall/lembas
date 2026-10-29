@@ -208,6 +208,7 @@ sub _routes ($self) {
     $signed_in->get( '/links/:ending' => [ ending => qr/[A-Za-z0-9_-]{1,64}/ ] )
         ->to('pages#link_stats')
         ->name('link_stats');
+    $signed_in->under('/admin')->to('pages#require_admin')->get('/')->to('pages#admin')->name('admin');
 
     # Last: every other route comes first
     $r->get( '/:ending' => [ ending => qr/[A-Za-z0-9_-]{1,64}/ ] )->to('redirect#go')->name('redirect');

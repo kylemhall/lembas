@@ -1,0 +1,4 @@
+% layout 'default';
+% title 'Admins only';
+<h1>Admins only</h1>
+<p>This page is for the administrators of <%= config 'site_name' %>.</p>
