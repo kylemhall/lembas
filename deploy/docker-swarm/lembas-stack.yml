@@ -1,0 +1,99 @@
+# Lembas, the URL shortener of ByWater Solutions (it replaces Polr), on the prod-bwsdocker01 Docker Swarm.
+#
+#   docker stack deploy -c deploy/docker-swarm/lembas-stack.yml lembas
+#
+# The image is built by .github/workflows/bws-build.yml: :latest follows main and the host's shepherd rolls it out.
+# To freeze a version, use its tag (e.g. :1.0.0). README.md has the first deployment, the import of Polr, the
+# switch of bywater.solutions from Polr to Lembas and the upgrades with migrations: in short,
+#   - a database "lembas" and its user on the MariaDB of the tools (172.20.24.33),
+#   - three external secrets: lembas_db_password, lembas_oidc_client_secret, lembas_secrets,
+#   - a Google OAuth client with https://lembas.tools.bywatersolutions.com/auth/callback as redirect URI,
+#   - the migrations of a new version, applied by the migrate service: until then /ready answers 503, so the swarm
+#     rolls the new version back instead of serving it.
+#       docker service scale lembas_migrate=1 && docker service logs -f lembas_migrate
+#       docker service scale lembas_migrate=0
+version: "3.8"
+
+# The environment and the secrets of the application, for its one-off commands too
+x-lembas: &lembas
+    image: quay.io/bywatersolutions/lembas:latest
+    environment:
+        - LEMBAS_BASE_URL=https://lembas.tools.bywatersolutions.com
+        - LEMBAS_SHORT_URL=https://bywater.solutions
+        - LEMBAS_DB_URL=mariadb://lembas@172.20.24.33/lembas
+        - LEMBAS_DB_PASSWORD_FILE=/run/secrets/lembas_db_password
+        - LEMBAS_SECRETS_FILE=/run/secrets/lembas_secrets
+        - LEMBAS_OIDC_CLIENT_ID=REPLACE_ME.apps.googleusercontent.com
+        - LEMBAS_OIDC_CLIENT_SECRET_FILE=/run/secrets/lembas_oidc_client_secret
+        - LEMBAS_ALLOWED_DOMAIN=bywatersolutions.com
+        - LEMBAS_ADMIN_EMAILS=kyle@bywatersolutions.com
+        # OpenTelemetry, off until the Elastic stack is there (README.md, "Telemetry"):
+        # - OTEL_EXPORTER_OTLP_ENDPOINT=https://REPLACE_ME:4318
+        # - OTEL_EXPORTER_OTLP_HEADERS_FILE=/run/secrets/lembas_otlp_headers
+        # - OTEL_RESOURCE_ATTRIBUTES=deployment.environment.name=production
+    secrets:
+        - lembas_db_password
+        - lembas_oidc_client_secret
+        - lembas_secrets
+
+services:
+    lembas:
+        <<: *lembas
+        networks:
+            - traefik-public
+        # /ready, not /health: a new task is only healthy once the database answers and every migration is applied
+        healthcheck:
+            test:
+                - CMD
+                - perl
+                - -MMojo::UserAgent
+                - -e
+                - "exit(Mojo::UserAgent->new->get('http://127.0.0.1:8080/ready')->res->is_success ? 0 : 1)"
+            interval: 30s
+            timeout: 3s
+            retries: 3
+            start_period: 15s
+        # The image stops with SIGQUIT: the workers finish their requests and export their telemetry
+        stop_grace_period: 30s
+        deploy:
+            replicas: 1
+            update_config:
+                order: start-first
+                failure_action: rollback
+                monitor: 30s
+            rollback_config:
+                order: stop-first
+            labels:
+                traefik.enable: "true"
+                traefik.constraint-label: traefik-public
+                traefik.http.routers.lembas.entrypoints: http
+                # bywater.solutions only once it is removed from the polr stack (README.md, "Switching from Polr")
+                traefik.http.routers.lembas.rule: "Host(`lembas.tools.bywatersolutions.com`) || Host(`bywater.solutions`)"
+                traefik.http.routers.lembas.service: lembas
+                traefik.http.services.lembas.loadbalancer.server.port: "8080"
+                shepherd.enable: "true"
+                diun.enable: "false"
+
+    # script/lembas migrate, once: scaled to 1, then back to 0. It follows :latest like the application
+    migrate:
+        <<: *lembas
+        command: ["script/lembas", "migrate"]
+        deploy:
+            replicas: 0
+            restart_policy:
+                condition: none
+            labels:
+                shepherd.enable: "true"
+                diun.enable: "false"
+
+secrets:
+    lembas_db_password:
+        external: true
+    lembas_oidc_client_secret:
+        external: true
+    lembas_secrets:
+        external: true
+
+networks:
+    traefik-public:
+        external: true
