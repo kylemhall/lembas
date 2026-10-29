@@ -1,0 +1,30 @@
+# Perl::Critic 1.156, "harsh". Checked by t/critic.t (make critic) on lib, script and t.
+# Every disabled policy carries its reason: add new exclusions the same way.
+severity = 3
+theme    = core
+verbose  = %f:%l:%c %m (%p, severity %s)\n
+
+# Test files are programs, not modules
+program-extensions = .t
+
+# Mojo::Base and Mojolicious::Lite turn on strict and warnings
+[TestingAndDebugging::RequireUseStrict]
+equivalent_modules = Mojo::Base Mojolicious::Lite
+
+[TestingAndDebugging::RequireUseWarnings]
+equivalent_modules = Mojo::Base Mojolicious::Lite
+
+# "sub ($self, $x)" is a signature, but the policy cannot see the "use feature" inside "Mojo::Base -signatures"
+[-Subroutines::ProhibitSubroutinePrototypes]
+
+# die is right in a Mojolicious application: the framework turns it into a 500 and logs the message
+[-ErrorHandling::RequireCarping]
+
+# Multi-line SQL in q{} reads better than a heredoc per query
+[-ValuesAndExpressions::ProhibitImplicitNewlines]
+
+# Route constraints and character classes are short; /x would only add noise
+[-RegularExpressions::RequireExtendedFormatting]
+
+# "use constant" is the Mojolicious idiom; Readonly would be a dependency for nothing
+[-ValuesAndExpressions::ProhibitConstantPragma]

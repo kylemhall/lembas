@@ -1,0 +1,57 @@
+#!/usr/bin/env perl
+use Mojo::Base -strict, -signatures;
+
+use Getopt::Long qw(GetOptions);
+use Mojo::File   qw(curfile path);
+use Perl::Tidy;
+
+chdir curfile->dirname->dirname   or die "Cannot go to the repository: $!\n";
+GetOptions( check => \my $check ) or die "Usage: script/tidy [--check] [FILE...]\n";
+
+my @files =
+    @ARGV
+    ? map { path($_) } @ARGV
+    : (
+    path('lib')->list_tree->grep(qr/\.pm\z/)->each,
+    path('t')->list_tree->grep(qr/\.(?:pm|t)\z/)->each,
+    path('script')->list->grep( sub { $_->slurp =~ /\A#!.*perl/ } )->each,
+    map { path( 'public', $_ )->list_tree->grep(qr/\.(?:css|js)\z/)->each } qw(css js),
+    );
+my @web  = grep { /\.(?:css|js)\z/ } @files;
+my @perl = grep { !/\.(?:css|js)\z/ } @files;
+
+my @untidy;
+for my $file (@perl) {
+    my $source = $file->slurp;
+    Perl::Tidy::perltidy( source => \$source, destination => \my $tidied, perltidyrc => '.perltidyrc', argv => [] )
+        and die "perltidy cannot parse $file\n";
+    next if $tidied eq $source;
+    push @untidy, "$file";
+    $file->spew($tidied) unless $check;
+}
+
+# prettier lists what it changes or what is not tidy; a missing prettier fails like an untidy file
+if (@web) {
+    system( 'prettier', $check ? '--check' : '--write', '--log-level=warn', @web ) == 0
+        or push @untidy, 'public/css, public/js (prettier)';
+}
+
+say for map { $check ? "Not tidy: $_" : "Tidied: $_" } @untidy;
+exit( $check && @untidy ? 1 : 0 );
+
+=head1 NAME
+
+script/tidy - Format the code of Lembas
+
+=head1 SYNOPSIS
+
+  script/tidy                 # format every file
+  script/tidy lib/Lembas.pm   # format one file
+  script/tidy --check         # list the files that are not tidy, exit 1 if there are any
+
+=head1 DESCRIPTION
+
+Perl files in lib, t and script are formatted with perltidy and .perltidyrc, the CSS and JavaScript files of
+public/css and public/js with prettier and .prettierrc.js. public/vendor is never touched.
+
+=cut
