@@ -11,9 +11,9 @@ sub list ($self) {
     my $c     = $self->openapi->valid_input or return;
     my $input = $c->validation->output;
     my $user  = $c->stash('user');
-    return $c->render_error(
-        Lembas::Error->new( code => 'forbidden', message => 'Only admins can list every link', status => 403 ) )
-        if $input->{all} && !$user->{is_admin};
+    if ( $input->{all} ) {
+        $c->require_admin or return;
+    }
 
     my $result = $c->links->list( { %$input{qw(q page per_page all)}, user_id => $user->{id} } );
     return $c->render( openapi => { %$result, page => $input->{page}, per_page => $input->{per_page} } );

@@ -201,6 +201,43 @@ paths:
             responses:
                 "204":
                     description: Revoked
+    /admin/users:
+        get:
+            operationId: list_users
+            x-mojo-to: users#admin_list
+            summary: Every user, with the number of their links (admins only)
+            responses:
+                "200":
+                    description: The users
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/UserList"
+    /admin/users/{id}:
+        patch:
+            operationId: update_user
+            x-mojo-to: users#admin_update
+            summary: Enable or disable an account (admins only)
+            description: A disabled account cannot sign in, and its API keys stop working.
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/UserUpdate"
+            responses:
+                "200":
+                    description: The user
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/User"
 components:
     parameters:
         ending:
@@ -392,4 +429,37 @@ components:
                 name:
                     type: string
                 is_admin:
+                    type: boolean
+        User:
+            allOf:
+                - $ref: "#/components/schemas/Me"
+                - type: object
+                  required: [is_active, last_login_at, created_at]
+                  properties:
+                      is_active:
+                          type: boolean
+                      last_login_at:
+                          type: string
+                          format: date-time
+                          nullable: true
+                          description: Null for an account imported from Polr that never signed in
+                      created_at:
+                          type: string
+                          format: date-time
+                      links_count:
+                          type: integer
+        UserList:
+            type: object
+            required: [users]
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/User"
+        UserUpdate:
+            type: object
+            required: [is_active]
+            additionalProperties: false
+            properties:
+                is_active:
                     type: boolean

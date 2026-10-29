@@ -29,9 +29,7 @@ subtest 'GET /api/v1/links' => sub {
         ->json_is( '/links/0/creator_email' => $jane->{email} );
     $t->get_ok('/api/v1/links?per_page=2&page=2')->status_is(200)->json_is( '/links/0/ending' => 'jane1' );
     $t->get_ok('/api/v1/links?q=ne2')->status_is(200)->json_is( '/total' => 1 );
-    $t->get_ok('/api/v1/links?all=true')
-        ->status_is(403)
-        ->json_is( '/errors/0/message' => 'Only admins can list every link' );
+    $t->get_ok('/api/v1/links?all=true')->status_is(403)->json_is( '/errors/0/message' => 'Admins only' );
     $t->get_ok('/api/v1/links?per_page=101')->status_is(400);
     $t->get_ok('/api/v1/links?page=0')->status_is(400);
 

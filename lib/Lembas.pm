@@ -98,6 +98,15 @@ sub _helpers ($self) {
         }
     );
 
+    # Renders a 403 for anybody else: "$c->require_admin or return"
+    $self->helper(
+        require_admin => sub ($c) {
+            return 1 if $c->stash('user')->{is_admin};
+            $c->render_error( Lembas::Error->new( code => 'forbidden', message => 'Admins only', status => 403 ) );
+            return;
+        }
+    );
+
     # A Lembas::Error as the error document of the API; anything else is a bug, and a 500
     $self->helper(
         render_error => sub ( $c, $error ) {
