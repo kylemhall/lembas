@@ -48,9 +48,11 @@ subtest 'database' => sub {
 };
 
 subtest 'helpers' => sub {
-    plan tests => 4;
+    plan tests => 6;
     my $t = Test::Mojo->new( Lembas => { env => \%env } );
     my $c = $t->app->build_controller;
+    isa_ok( $c->oidc, 'Lembas::Model::OIDC', 'oidc' );
+    is( $c->oidc->redirect_url, 'https://lembas.example.org/auth/callback', 'the callback, on the base URL' );
     isa_ok( $c->api_keys, 'Lembas::Model::ApiKeys', 'api_keys' );
     isa_ok( $c->clicks,   'Lembas::Model::Clicks',  'clicks' );
     isa_ok( $c->links,    'Lembas::Model::Links',   'links' );

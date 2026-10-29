@@ -8,6 +8,7 @@ use Lembas::Error;
 use Lembas::Model::ApiKeys;
 use Lembas::Model::Clicks;
 use Lembas::Model::Links;
+use Lembas::Model::OIDC;
 use Lembas::Model::Users;
 use Lembas::Telemetry;
 
@@ -50,6 +51,17 @@ has links => sub ($self) {
     );
 };
 
+has oidc => sub ($self) {
+    my $config = $self->config;
+    return Lembas::Model::OIDC->new(
+        issuer         => $config->{oidc_issuer},
+        client_id      => $config->{oidc_client_id},
+        client_secret  => $config->{oidc_client_secret},
+        redirect_url   => "$config->{base_url}/auth/callback",
+        allowed_domain => $config->{allowed_domain},
+    );
+};
+
 has telemetry => sub ($self) { Lembas::Telemetry->new( %{ $self->config->{telemetry} }, version => $VERSION ) };
 
 sub startup ($self) {
@@ -83,7 +95,7 @@ sub _sessions ($self) {
 sub _helpers ($self) {
 
     # The models, for the controllers
-    for my $model (qw(api_keys clicks links users)) {
+    for my $model (qw(api_keys clicks links oidc users)) {
         $self->helper( $model => sub ($c) { $c->app->$model } );
     }
 
@@ -221,6 +233,10 @@ The L<Lembas::Model::Clicks> of the application, also the C<clicks> helper.
 =head2 links
 
 The L<Lembas::Model::Links> of the application, also the C<links> helper.
+
+=head2 oidc
+
+The L<Lembas::Model::OIDC> of the application, also the C<oidc> helper.
 
 =head2 telemetry
 
