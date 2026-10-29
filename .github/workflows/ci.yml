@@ -1,0 +1,62 @@
+name: CI
+
+# What make all runs: the test image is built (its dependency layers cached), then the formatting and Perl::Critic,
+# the suite against a MariaDB (the JavaScript tests included) and the 100% coverage gate run in it.
+# bws-build.yml calls it before it builds an image.
+# yamllint disable-line rule:truthy
+on:
+    pull_request:
+    push:
+        branches-ignore:
+            - main
+    workflow_call:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ci-${{ github.ref }}-${{ github.event_name }}
+    cancel-in-progress: true
+
+jobs:
+    test:
+        name: Checks, tests and coverage
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out
+              uses: actions/checkout@v7
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v4
+
+            # Tagged like the test service of compose.yml, which then uses it instead of building it again
+            - name: Build the test image
+              uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  target: test
+                  load: true
+                  tags: lembas-test
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Formatting and Perl::Critic
+              run: make lint
+
+            - name: Tests
+              run: make test
+
+            - name: Coverage of lib/ (100%)
+              run: make coverage
+
+            - name: Keep the coverage database
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: cover_db
+                  path: cover_db
+                  if-no-files-found: ignore
+
+            - name: Stop the services
+              if: always()
+              run: docker compose --profile test down -v --remove-orphans

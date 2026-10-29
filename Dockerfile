@@ -38,7 +38,9 @@ USER lembas
 STOPSIGNAL SIGQUIT
 
 ARG VERSION=dev
-ENV MOJO_MODE=production MOJO_REVERSE_PROXY=1 LEMBAS_BUILD_VERSION=${VERSION}
+LABEL org.opencontainers.image.title=Lembas org.opencontainers.image.version=$VERSION \
+    org.opencontainers.image.licenses=AGPL-3.0-or-later
+ENV MOJO_MODE=production MOJO_REVERSE_PROXY=1
 EXPOSE 8080
 
 # The slim image has no curl, Mojo::UserAgent is already there
