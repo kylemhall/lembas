@@ -26,8 +26,11 @@ subtest 'it is served' => sub {
 };
 
 subtest 'every operation has a controller' => sub {
-    my $spec       = JSON::Validator->new->schema('api/lembas.yaml')->schema->data;
-    my @operations = map { values %{ $spec->{paths}{$_} } } keys %{ $spec->{paths} };
+    my $spec = JSON::Validator->new->schema('api/lembas.yaml')->schema->data;
+    my @operations;
+    for my $path ( values %{ $spec->{paths} } ) {
+        push @operations, map { $path->{$_} } grep { /\A(?:get|put|post|patch|delete)\z/ } keys %$path;
+    }
     plan tests => 2 * @operations;
     for my $operation (@operations) {
         my ( $name, $action ) = split /#/, $operation->{'x-mojo-to'};

@@ -4,6 +4,7 @@ use Mojo::Base 'Mojolicious', -signatures;
 use Mojo::mysql;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Lembas::Config;
+use Lembas::Error;
 use Lembas::Model::ApiKeys;
 use Lembas::Model::Clicks;
 use Lembas::Model::Links;
@@ -94,6 +95,18 @@ sub _helpers ($self) {
             return $user if $user && $user->{is_active};
             delete $c->session->{user_id};
             return;
+        }
+    );
+
+    # A Lembas::Error as the error document of the API; anything else is a bug, and a 500
+    $self->helper(
+        render_error => sub ( $c, $error ) {
+            die $error unless Lembas::Error->caught($error);
+            my $status = $error->status;
+            return $c->render(
+                openapi => { errors => [ { message => $error->message, path => '/' } ], status => $status },
+                status  => $status
+            );
         }
     );
     return;

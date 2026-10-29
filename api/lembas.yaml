@@ -23,7 +23,116 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/Me"
+    /links:
+        get:
+            operationId: list_links
+            x-mojo-to: links#list
+            summary: The links of the user, newest first, or everybody's for an admin
+            parameters:
+                - name: q
+                  in: query
+                  description: Only the links whose ending or long URL contains this text
+                  schema:
+                      type: string
+                      maxLength: 200
+                - name: page
+                  in: query
+                  schema:
+                      type: integer
+                      minimum: 1
+                      default: 1
+                - name: per_page
+                  in: query
+                  schema:
+                      type: integer
+                      minimum: 1
+                      maximum: 100
+                      default: 25
+                - name: all
+                  in: query
+                  description: The links of every user (admins only)
+                  schema:
+                      type: boolean
+                      default: false
+            responses:
+                "200":
+                    description: A page of links
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/LinkList"
+        post:
+            operationId: create_link
+            x-mojo-to: links#create
+            summary: Shorten a URL
+            description: >-
+                Without an ending, the link the user already made for this URL is returned (200) when there is one,
+                else a link with a random ending is created (201).
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/LinkCreate"
+            responses:
+                "200":
+                    description: The link the user already made for this URL
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Link"
+                "201":
+                    description: The new link
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Link"
+    /links/{ending}:
+        parameters:
+            - $ref: "#/components/parameters/ending"
+        get:
+            operationId: get_link
+            x-mojo-to: links#show
+            summary: A link of the user (any link for an admin)
+            responses:
+                "200":
+                    description: The link
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Link"
+        patch:
+            operationId: update_link
+            x-mojo-to: links#update
+            summary: Change the long URL of a link, or disable it
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/LinkUpdate"
+            responses:
+                "200":
+                    description: The changed link
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Link"
+        delete:
+            operationId: delete_link
+            x-mojo-to: links#remove
+            summary: Delete a link and its clicks
+            responses:
+                "204":
+                    description: Deleted
 components:
+    parameters:
+        ending:
+            name: ending
+            in: path
+            required: true
+            schema:
+                $ref: "#/components/schemas/Ending"
     securitySchemes:
         apiKey:
             type: apiKey
@@ -50,6 +159,72 @@ components:
                                 type: string
                 status:
                     type: integer
+        Ending:
+            type: string
+            pattern: "^[A-Za-z0-9_-]{1,64}$"
+        Link:
+            type: object
+            required: [ending, short_url, long_url, clicks, is_disabled, is_custom, is_api, created_at, updated_at]
+            properties:
+                ending:
+                    $ref: "#/components/schemas/Ending"
+                short_url:
+                    type: string
+                long_url:
+                    type: string
+                clicks:
+                    type: integer
+                is_disabled:
+                    type: boolean
+                is_custom:
+                    type: boolean
+                is_api:
+                    type: boolean
+                    description: Created with an API key
+                creator_email:
+                    type: string
+                    nullable: true
+                    description: Null for the anonymous links imported from Polr
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+        LinkList:
+            type: object
+            required: [links, page, per_page, total]
+            properties:
+                links:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/Link"
+                page:
+                    type: integer
+                per_page:
+                    type: integer
+                total:
+                    type: integer
+        LinkCreate:
+            type: object
+            required: [long_url]
+            additionalProperties: false
+            properties:
+                long_url:
+                    type: string
+                    maxLength: 8192
+                ending:
+                    $ref: "#/components/schemas/Ending"
+        LinkUpdate:
+            type: object
+            additionalProperties: false
+            minProperties: 1
+            properties:
+                long_url:
+                    type: string
+                    maxLength: 8192
+                is_disabled:
+                    type: boolean
         Me:
             type: object
             required: [id, email, name, is_admin]
