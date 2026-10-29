@@ -258,11 +258,70 @@ function linkStats() {
     };
 }
 
+// The key of a new API key is only seen once: in "created", until it is dismissed
+function apiKeys() {
+    return {
+        keys: [],
+        label: "",
+        created: null,
+        busy: false,
+        init() {
+            return this.load();
+        },
+        async load() {
+            try {
+                const { data } = await api("GET", "/api_keys");
+                this.keys = data.api_keys;
+            } catch (error) {
+                notify(error.message, "error");
+            }
+        },
+        async create() {
+            this.busy = true;
+            try {
+                const { data } = await api("POST", "/api_keys", {
+                    label: this.label,
+                });
+                this.created = data;
+                this.label = "";
+                await this.load();
+            } catch (error) {
+                notify(error.message, "error");
+            } finally {
+                this.busy = false;
+            }
+        },
+        copy() {
+            return copyText(this.created.key);
+        },
+        dismiss() {
+            this.created = null;
+        },
+        async revoke(key) {
+            const question =
+                'Revoke the key "' +
+                key.label +
+                '"? Scripts that use it will stop working.';
+            if (!window.confirm(question)) {
+                return;
+            }
+            try {
+                await api("DELETE", "/api_keys/" + key.id);
+                notify("Revoked " + key.label, "success");
+                await this.load();
+            } catch (error) {
+                notify(error.message, "error");
+            }
+        },
+    };
+}
+
 function register(alpine) {
     alpine.store("toast", toastStore);
     alpine.data("shortener", shortener);
     alpine.data("linkList", linkList);
     alpine.data("linkStats", linkStats);
+    alpine.data("apiKeys", apiKeys);
 }
 
 globalThis.Lembas = {
@@ -273,6 +332,7 @@ globalThis.Lembas = {
     shortener,
     linkList,
     linkStats,
+    apiKeys,
     register,
 };
 document.addEventListener("alpine:init", () => register(window.Alpine));

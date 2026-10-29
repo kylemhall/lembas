@@ -1,0 +1,47 @@
+<section x-data="apiKeys" class="mt-5">
+    <h2 class="h5">API keys</h2>
+    <p class="text-body-secondary">
+        For scripts: send a key in the <code>X-Api-Key</code> header of the requests to the
+        <a href="/api/v1">REST API</a>, or as the <code>key</code> parameter of the Polr API.
+    </p>
+    <div class="alert alert-warning" x-cloak x-show="created">
+        <p class="mb-2">
+            The new key <strong x-text="created ? created.label : ''"></strong>: copy it now, it is never shown again.
+        </p>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <code class="fs-6 text-break" x-text="created ? created.key : ''"></code>
+            <button class="btn btn-sm btn-outline-dark" type="button" x-on:click="copy">Copy</button>
+            <button class="btn btn-sm btn-link" type="button" x-on:click="dismiss">Done</button>
+        </div>
+    </div>
+    <form class="d-flex gap-2 mb-3" x-on:submit.prevent="create">
+        <label class="visually-hidden" for="key-label">Label</label>
+        <input id="key-label" class="form-control" maxlength="64" required
+            placeholder="A label, like the name of the script" x-model="label">
+        <button class="btn btn-outline-primary text-nowrap" :disabled="busy">New key</button>
+    </form>
+    <table class="table table-sm align-middle" x-cloak x-show="keys.length > 0">
+        <thead>
+            <tr>
+                <th>Label</th>
+                <th>Key</th>
+                <th>Created</th>
+                <th>Last used</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <template x-for="key in keys" :key="key.id">
+                <tr>
+                    <td x-text="key.label"></td>
+                    <td><code x-text="key.key_prefix + '...'"></code></td>
+                    <td x-text="key.created_at.substring(0, 10)"></td>
+                    <td x-text="key.last_used_at ? key.last_used_at.substring(0, 10) : 'never'"></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger" type="button" x-on:click="revoke(key)">Revoke</button>
+                    </td>
+                </tr>
+            </template>
+        </tbody>
+    </table>
+</section>

@@ -3,6 +3,7 @@
 % if ( my $user = stash 'user' ) {
     %= include 'pages/_shortener'
     %= include 'pages/_links', heading => 'Your links', all => 0
+    %= include 'pages/_api_keys'
 % } else {
     <div class="row justify-content-center">
         <div class="col-md-6 col-lg-5">

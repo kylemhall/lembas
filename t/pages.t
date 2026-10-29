@@ -30,13 +30,14 @@ subtest 'anonymous' => sub {
 };
 
 subtest 'signed in' => sub {
-    plan tests => 12;
+    plan tests => 13;
     reset_db($t);
     login_as( $t, create_user( $t, name => 'Jane Doe' ) );
     $t->get_ok('/')
         ->status_is(200)
         ->element_exists( 'section[x-data="shortener"]',              'the shortener' )
         ->element_exists( 'section[x-data="linkList"][data-all="0"]', 'the links of the user' )
+        ->element_exists( 'section[x-data="apiKeys"]',                'the API keys of the user' )
         ->text_like( 'nav span' => qr/Jane Doe/ )
         ->element_exists( 'form[action="/auth/logout"][method="post"] input[name="csrf_token"]', 'sign out' )
         ->element_exists_not( 'a[href="/admin"]', 'not an admin' );
