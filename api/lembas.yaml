@@ -152,6 +152,55 @@ paths:
                         application/json:
                             schema:
                                 $ref: "#/components/schemas/LinkStats"
+    /api_keys:
+        get:
+            operationId: list_api_keys
+            x-mojo-to: api_keys#list
+            summary: The API keys of the user, without the keys themselves
+            security:
+                - session: []
+            responses:
+                "200":
+                    description: The keys
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiKeyList"
+        post:
+            operationId: create_api_key
+            x-mojo-to: api_keys#create
+            summary: A new API key; the response is the only time it is shown
+            security:
+                - session: []
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/ApiKeyCreate"
+            responses:
+                "201":
+                    description: The new key
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/ApiKeyCreated"
+    /api_keys/{id}:
+        delete:
+            operationId: delete_api_key
+            x-mojo-to: api_keys#revoke
+            summary: Revoke an API key
+            security:
+                - session: []
+            parameters:
+                - name: id
+                  in: path
+                  required: true
+                  schema:
+                      type: integer
+            responses:
+                "204":
+                    description: Revoked
 components:
     parameters:
         ending:
@@ -170,6 +219,49 @@ components:
             in: cookie
             name: lembas
     schemas:
+        ApiKey:
+            type: object
+            required: [id, label, key_prefix, created_at, last_used_at]
+            properties:
+                id:
+                    type: integer
+                label:
+                    type: string
+                key_prefix:
+                    type: string
+                    description: The start of the key, to recognize it
+                created_at:
+                    type: string
+                    format: date-time
+                last_used_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+        ApiKeyCreate:
+            type: object
+            required: [label]
+            additionalProperties: false
+            properties:
+                label:
+                    type: string
+                    minLength: 1
+                    maxLength: 64
+        ApiKeyCreated:
+            allOf:
+                - $ref: "#/components/schemas/ApiKey"
+                - type: object
+                  required: [key]
+                  properties:
+                      key:
+                          type: string
+        ApiKeyList:
+            type: object
+            required: [api_keys]
+            properties:
+                api_keys:
+                    type: array
+                    items:
+                        $ref: "#/components/schemas/ApiKey"
         DefaultResponse:
             type: object
             required: [errors]
