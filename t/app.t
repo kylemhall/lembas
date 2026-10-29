@@ -1,6 +1,6 @@
 use Mojo::Base -strict, -signatures;
 
-use Test::More tests => 4;
+use Test::More tests => 5;
 use Test::NoWarnings;
 use Mojo::Server;
 use Test::Mojo;
@@ -36,4 +36,13 @@ subtest 'configuration of the tests' => sub {
     my $t = Test::Mojo->new( Lembas => { env => { %env, LEMBAS_SITE_NAME => 'Test', LEMBAS_LOG_LEVEL => 'fatal' } } );
     is( $t->app->config->{site_name}, 'Test',  'Test::Mojo gives the environment' );
     is( $t->app->log->level,          'fatal', 'log level' );
+};
+
+subtest 'database' => sub {
+    plan tests => 3;
+    my $t     = Test::Mojo->new( Lembas => { env => { %env, LEMBAS_DB_PASSWORD => 'db-password' } } );
+    my $mysql = $t->app->mysql;
+    is( $mysql->dsn,              'dbi:MariaDB:dbname=lembas;host=db', 'the database of LEMBAS_DB_URL' );
+    is( $mysql->password,         'db-password',                       'the password of LEMBAS_DB_PASSWORD' );
+    is( $mysql->migrations->name, 'lembas',                            'the migrations of Lembas' );
 };

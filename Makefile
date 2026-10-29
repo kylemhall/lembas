@@ -6,7 +6,7 @@ CHECK   := $(COMPOSE) run --rm --no-deps test
 JOBS    ?= 4
 IMAGE   ?= lembas:local
 
-.PHONY: help test lint critic tidy-check format dev build shell clean
+.PHONY: help test lint critic tidy-check format dev migrate build shell clean
 
 help: ## Show this help (default)
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-11s %s\n", $$1, $$2}'
@@ -27,6 +27,9 @@ format: ## Format the code with perltidy and prettier (writes the files)
 
 dev: ## Run morbo on http://localhost:8080 with MariaDB (settings from .env)
 	$(COMPOSE) --profile dev up --build
+
+migrate: ## Apply the migrations to the development database
+	$(COMPOSE) --profile dev run --rm dev script/lembas migrate
 
 build: ## Build the production image $(IMAGE)
 	docker build --target app -t $(IMAGE) .
