@@ -1,12 +1,13 @@
 use Mojo::Base -strict, -signatures;
 
 use Test::More;
-use Lembas::Test qw(create_link create_user login_as reset_db test_app);
+use Lembas::Test qw(create_click create_link create_user login_as reset_db test_app);
 use Test::NoWarnings;
 use Test::MockModule;
 use Mojo::JSON qw(false true);
+use Time::Piece;
 
-plan tests => 9;
+plan tests => 10;
 
 my $t = test_app( LEMBAS_ADMIN_EMAILS => 'admin@example.org', LEMBAS_SHORT_URL => 'https://short.example' );
 
@@ -134,6 +135,47 @@ subtest 'DELETE /api/v1/links/{ending}' => sub {
     $t->get_ok('/api/v1/links/janes')->status_is( 404, 'gone' );
     $t->delete_ok('/api/v1/links/johns')->status_is(403);
     $t->delete_ok('/api/v1/links/with%20space')->status_is(400);
+};
+
+subtest 'GET /api/v1/links/{ending}/stats' => sub {
+    plan tests => 29;
+    reset_db($t);
+    my ( $jane, $john ) = ( create_user($t), create_user($t) );
+    my $link = create_link( $t, ending => 'janes', user_id => $jane->{id} );
+    create_link( $t, ending => 'johns', user_id => $john->{id} );
+    my $db = $t->app->mysql->db;
+    $db->query(
+        'INSERT INTO clicks (link_id, clicked_at, referer_host) VALUES (?, UTC_TIMESTAMP(), ?)', $link->{id},
+        'a.example'
+    );
+    $db->query( 'INSERT INTO clicks (link_id, clicked_at) VALUES (?, UTC_TIMESTAMP() - INTERVAL 30 DAY)', $link->{id} );
+    create_click( $t, link_id => $link->{id}, clicked_at => '2026-03-01 10:00:00', referer_host => 'b.example' );
+    create_click( $t, link_id => $link->{id}, clicked_at => '2026-03-02 10:00:00', referer_host => 'b.example' );
+    login_as( $t, $jane );
+
+    my $today = Time::Piece::gmtime();
+    $t->get_ok('/api/v1/links/janes/stats')
+        ->status_is(200)
+        ->json_is( '/to'             => $today->ymd,                   'until today by default' )
+        ->json_is( '/from'           => ( $today - 29 * 86_400 )->ymd, 'for 30 days' )
+        ->json_is( '/total'          => 1 )
+        ->json_is( '/clicks_per_day' => [ { day  => $today->ymd, clicks => 1 } ] )
+        ->json_is( '/top_referers'   => [ { host => 'a.example', clicks => 1 } ] );
+    $t->get_ok('/api/v1/links/janes/stats?from=2026-03-01&to=2026-03-02')
+        ->status_is(200)
+        ->json_is( '/total'          => 2 )
+        ->json_is( '/top_referers/0' => { host => 'b.example', clicks => 2 } );
+    $t->get_ok('/api/v1/links/janes/stats?to=2026-03-30')
+        ->status_is(200)
+        ->json_is( '/from' => '2026-03-01', '30 days before "to"' );
+    $t->get_ok('/api/v1/links/janes/stats?from=2026-03-02&to=2026-03-01')
+        ->status_is(400)
+        ->json_like( '/errors/0/message' => qr/"from" must be a day before "to"/ );
+    $t->get_ok('/api/v1/links/janes/stats?from=2025-01-01&to=2026-01-02')->status_is( 400, 'more than a year' );
+    $t->get_ok('/api/v1/links/janes/stats?from=2025-01-01&to=2026-01-01')->status_is( 200, 'a year' );
+    $t->get_ok('/api/v1/links/janes/stats?from=yesterday')->status_is( 400, 'days only' );
+    $t->get_ok('/api/v1/links/johns/stats')->status_is(403);
+    $t->get_ok('/api/v1/links/nothing/stats')->status_is(404);
 };
 
 subtest 'unexpected errors' => sub {

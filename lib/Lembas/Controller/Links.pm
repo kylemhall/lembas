@@ -1,7 +1,11 @@
 package Lembas::Controller::Links;
 use Mojo::Base 'Mojolicious::Controller', -signatures;
 
+use Time::Piece;
+use Time::Seconds qw(ONE_DAY);
 use Lembas::Error;
+
+use constant MAX_DAYS => 365;
 
 sub list ($self) {
     my $c     = $self->openapi->valid_input or return;
@@ -53,6 +57,27 @@ sub remove ($self) {
     return $c->rendered(204);
 }
 
+sub stats ($self) {
+    my $c     = $self->openapi->valid_input or return;
+    my $link  = $c->_owned_link             or return;
+    my $input = $c->validation->output;
+
+    my $to   = _day( defined $input->{to} ? $input->{to} : Time::Piece::gmtime()->ymd );
+    my $from = defined $input->{from} ? _day( $input->{from} ) : $to - 29 * ONE_DAY;
+    return $c->render_error(
+        Lembas::Error->new(
+            code    => 'invalid_period',
+            message => '"from" must be a day before "to", at most ' . MAX_DAYS . ' days before',
+            status  => 400
+        )
+    ) if $from > $to || $to - $from > MAX_DAYS * ONE_DAY;
+
+    my $stats = $c->clicks->stats( $link->{id}, $from->ymd, $to->ymd );
+    return $c->render( openapi => { ending => $link->{ending}, from => $from->ymd, to => $to->ymd, %$stats } );
+}
+
+sub _day ($ymd) { return Time::Piece->strptime( $ymd, '%Y-%m-%d' ) }
+
 # The link of the path when the user may see it: renders a 404 or a 403 and returns nothing otherwise
 sub _owned_link ($c) {
     my $user = $c->stash('user');
@@ -88,6 +113,10 @@ C<POST /api/v1/links>
 =head2 show
 
 C<GET /api/v1/links/{ending}>
+
+=head2 stats
+
+C<GET /api/v1/links/{ending}/stats>
 
 =head2 update
 

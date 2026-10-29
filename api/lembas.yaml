@@ -125,6 +125,33 @@ paths:
             responses:
                 "204":
                     description: Deleted
+    /links/{ending}/stats:
+        parameters:
+            - $ref: "#/components/parameters/ending"
+        get:
+            operationId: get_link_stats
+            x-mojo-to: links#stats
+            summary: The clicks of a link per day and its top referers, between two days in UTC
+            parameters:
+                - name: from
+                  in: query
+                  description: The first day, 29 days before "to" by default
+                  schema:
+                      type: string
+                      format: date
+                - name: to
+                  in: query
+                  description: The last day, today by default; at most 365 days after "from"
+                  schema:
+                      type: string
+                      format: date
+            responses:
+                "200":
+                    description: The stats
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/LinkStats"
 components:
     parameters:
         ending:
@@ -225,6 +252,43 @@ components:
                     maxLength: 8192
                 is_disabled:
                     type: boolean
+        LinkStats:
+            type: object
+            required: [ending, from, to, total, clicks_per_day, top_referers]
+            properties:
+                ending:
+                    $ref: "#/components/schemas/Ending"
+                from:
+                    type: string
+                    format: date
+                to:
+                    type: string
+                    format: date
+                total:
+                    type: integer
+                clicks_per_day:
+                    type: array
+                    description: The days with clicks
+                    items:
+                        type: object
+                        required: [day, clicks]
+                        properties:
+                            day:
+                                type: string
+                                format: date
+                            clicks:
+                                type: integer
+                top_referers:
+                    type: array
+                    description: The ten hosts that sent the most clicks; an empty host is a direct visit
+                    items:
+                        type: object
+                        required: [host, clicks]
+                        properties:
+                            host:
+                                type: string
+                            clicks:
+                                type: integer
         Me:
             type: object
             required: [id, email, name, is_admin]
