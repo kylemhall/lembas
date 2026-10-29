@@ -1,0 +1,69 @@
+# Lembas development and tests. The host needs only Docker, see the Makefile:
+#   make test    the suite, in the test image, against the mariadb service
+#   make dev     morbo on http://localhost:8080 (cp .env.example .env first)
+x-lembas-env: &lembas-env
+    LEMBAS_BASE_URL: ${LEMBAS_BASE_URL:-http://localhost:8080}
+    LEMBAS_SHORT_URL: ${LEMBAS_SHORT_URL:-}
+    LEMBAS_DB_URL: mariadb://lembas@mariadb/lembas
+    LEMBAS_DB_PASSWORD: lembas
+    LEMBAS_SECRETS: ${LEMBAS_SECRETS:-development-only-secret}
+    LEMBAS_OIDC_CLIENT_ID: ${LEMBAS_OIDC_CLIENT_ID:-}
+    LEMBAS_OIDC_CLIENT_SECRET: ${LEMBAS_OIDC_CLIENT_SECRET:-}
+    LEMBAS_ALLOWED_DOMAIN: ${LEMBAS_ALLOWED_DOMAIN:-bywatersolutions.com}
+    LEMBAS_ADMIN_EMAILS: ${LEMBAS_ADMIN_EMAILS:-}
+    LEMBAS_LOG_LEVEL: ${LEMBAS_LOG_LEVEL:-debug}
+
+services:
+    mariadb:
+        image: mariadb:11.4
+        environment:
+            MARIADB_ROOT_PASSWORD: root
+            MARIADB_DATABASE: lembas
+            MARIADB_USER: lembas
+            MARIADB_PASSWORD: lembas
+        volumes:
+            - mariadb-data:/var/lib/mysql
+        healthcheck:
+            test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+            interval: 2s
+            timeout: 5s
+            retries: 30
+
+    # The repository is bind mounted: edits on the host are tested as they are
+    test:
+        build:
+            context: .
+            target: test
+        image: lembas-test
+        profiles: [test]
+        depends_on:
+            mariadb:
+                condition: service_healthy
+        environment:
+            # Root: every test process creates and drops its own database
+            TEST_ONLINE: mariadb://root:root@mariadb/lembas_test
+        volumes:
+            - .:/app
+        working_dir: /app
+        command: ["prove", "-r", "t"]
+
+    dev:
+        build:
+            context: .
+            target: app
+        image: lembas-dev
+        profiles: [dev]
+        depends_on:
+            mariadb:
+                condition: service_healthy
+        environment:
+            <<: *lembas-env
+            MOJO_MODE: development
+        ports:
+            - "8080:8080"
+        volumes:
+            - .:/app
+        command: ["morbo", "--listen", "http://*:8080", "--watch", "lib", "--watch", "templates", "--watch", "api", "script/lembas"]
+
+volumes:
+    mariadb-data:

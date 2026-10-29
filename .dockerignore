@@ -1,0 +1,7 @@
+.git
+.githooks
+.env
+cover_db
+local
+node_modules
+deploy
