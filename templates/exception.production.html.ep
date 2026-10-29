@@ -1,0 +1,4 @@
+% layout 'default';
+% title 'Error';
+<h1>Something went wrong</h1>
+<p>The error is logged with the request id <code><%= $c->req->request_id %></code>.</p>

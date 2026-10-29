@@ -1,0 +1,4 @@
+% layout 'default';
+% title 'Not found';
+<h1>Nothing here</h1>
+<p>This short link does not exist, or the page has moved.</p>

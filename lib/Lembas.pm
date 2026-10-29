@@ -182,6 +182,9 @@ sub _routes ($self) {
             },
         }
     );
+
+    # Last: every other route comes first
+    $r->get( '/:ending' => [ ending => qr/[A-Za-z0-9_-]{1,64}/ ] )->to('redirect#go')->name('redirect');
     return;
 }
 

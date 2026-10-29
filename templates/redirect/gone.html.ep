@@ -1,0 +1,4 @@
+% layout 'default';
+% title 'Link disabled';
+<h1>This link is disabled</h1>
+<p>Its owner or an administrator turned it off.</p>
