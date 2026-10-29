@@ -204,6 +204,11 @@ sub _routes ($self) {
     $r->get('/auth/callback')->to('auth#callback')->name('auth_callback');
     $r->post('/auth/logout')->to('auth#logout')->name('logout');
 
+    my $signed_in = $r->under('/')->to('pages#require_user');
+    $signed_in->get( '/links/:ending' => [ ending => qr/[A-Za-z0-9_-]{1,64}/ ] )
+        ->to('pages#link_stats')
+        ->name('link_stats');
+
     # Last: every other route comes first
     $r->get( '/:ending' => [ ending => qr/[A-Za-z0-9_-]{1,64}/ ] )->to('redirect#go')->name('redirect');
     return;

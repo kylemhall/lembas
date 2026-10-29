@@ -22,6 +22,7 @@ describe("register", () => {
         assert.equal(browser.stores.toast, toastStore);
         assert.equal(browser.components.shortener, shortener);
         assert.equal(browser.components.linkList, linkList);
+        assert.equal(browser.components.linkStats, browser.Lembas.linkStats);
     });
 });
 

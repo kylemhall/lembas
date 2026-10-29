@@ -3,6 +3,18 @@ use Mojo::Base 'Mojolicious::Controller', -signatures;
 
 sub home ($c) { return $c->render( 'pages/home', user => $c->current_user ) }
 
+# Under every page that needs a signed-in user: the anonymous go to the sign-in, and come back after it
+sub require_user ($c) {
+    if ( my $user = $c->current_user ) {
+        $c->stash( user => $user );
+        return 1;
+    }
+    $c->redirect_to( $c->url_for('login')->query( return_to => $c->req->url->path->to_string ) );
+    return;
+}
+
+sub link_stats ($c) { return $c->render( 'pages/link', ending => $c->stash('ending') ) }
+
 1;
 
 =head1 NAME
@@ -12,5 +24,13 @@ Lembas::Controller::Pages - The pages: HTML shells for the Alpine.js components 
 =head2 home
 
 C</>: the shortener and the links of the user, or the sign-in button.
+
+=head2 require_user
+
+Lets signed-in users through, sends the others to the sign-in.
+
+=head2 link_stats
+
+C</links/:ending>: the stats of a link.
 
 =cut

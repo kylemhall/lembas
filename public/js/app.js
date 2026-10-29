@@ -207,10 +207,62 @@ function linkList() {
     };
 }
 
+// data-ending on its element: the link and its clicks over the last "days" days, in UTC
+function linkStats() {
+    return {
+        ending: "",
+        days: 30,
+        link: null,
+        stats: null,
+        error: "",
+        init() {
+            this.ending = this.$root.dataset.ending;
+            return this.load();
+        },
+        get perDay() {
+            return this.stats ? this.stats.clicks_per_day : [];
+        },
+        get referers() {
+            return this.stats ? this.stats.top_referers : [];
+        },
+        get total() {
+            return this.stats ? this.stats.total : 0;
+        },
+        get maxClicks() {
+            return Math.max(1, ...this.perDay.map(day => day.clicks));
+        },
+        async load() {
+            const path = "/links/" + encodeURIComponent(this.ending);
+            const to = new Date();
+            const from = new Date(to.getTime() - (this.days - 1) * 86400000);
+            const period = new URLSearchParams({
+                from: from.toISOString().slice(0, 10),
+                to: to.toISOString().slice(0, 10),
+            });
+            try {
+                const [link, stats] = await Promise.all([
+                    api("GET", path),
+                    api("GET", path + "/stats?" + period),
+                ]);
+                this.link = link.data;
+                this.stats = stats.data;
+                this.error = "";
+            } catch (error) {
+                this.error = error.message;
+            }
+        },
+        setRange(days) {
+            this.days = days;
+            return this.load();
+        },
+    };
+}
+
 function register(alpine) {
     alpine.store("toast", toastStore);
     alpine.data("shortener", shortener);
     alpine.data("linkList", linkList);
+    alpine.data("linkStats", linkStats);
 }
 
 globalThis.Lembas = {
@@ -220,6 +272,7 @@ globalThis.Lembas = {
     copyText,
     shortener,
     linkList,
+    linkStats,
     register,
 };
 document.addEventListener("alpine:init", () => register(window.Alpine));
