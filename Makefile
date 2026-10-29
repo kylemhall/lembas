@@ -6,13 +6,20 @@ CHECK   := $(COMPOSE) run --rm --no-deps test
 JOBS    ?= 4
 IMAGE   ?= lembas:local
 
-.PHONY: help test lint critic tidy-check format dev migrate build shell clean
+.PHONY: help all test coverage cover lint critic tidy-check format dev migrate build shell clean
 
 help: ## Show this help (default)
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-11s %s\n", $$1, $$2}'
 
+all: lint test coverage ## What CI runs: the checks, the suite, then the 100% coverage gate
+
 test: ## Run the suite in the test image, against the compose MariaDB
 	$(RUN) prove -r -j$(JOBS) t
+
+coverage: ## Run the suite under Devel::Cover, fail unless lib/ is 100% covered (script/coverage)
+	$(RUN) script/coverage
+
+cover: coverage ## Same as coverage
 
 lint: critic tidy-check ## Perl::Critic and the formatting check
 

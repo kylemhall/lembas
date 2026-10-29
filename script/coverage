@@ -1,0 +1,29 @@
+#!/bin/sh
+# Runs the suite under Devel::Cover and fails unless lib/ is 100% covered for statements, branches, conditions and
+# subroutines. t/ and script/ are not measured, POD is left out on purpose. Needs TEST_ONLINE (see compose.yml):
+# without a database the database tests skip and most of lib/ looks uncovered.
+set -eu
+cd "$(dirname "$0")/.."
+: "${TEST_ONLINE:?TEST_ONLINE must name a MariaDB server, like mariadb://root:root@mariadb/lembas_test}"
+
+criteria=statement,branch,condition,subroutine
+rm -rf cover_db
+
+# critic, tidy and pod never load lib/ and are the slowest files
+HARNESS_PERL_SWITCHES="-MDevel::Cover=-db,cover_db,-coverage,$criteria,+ignore,^t/,+ignore,^script/,-silent,1" \
+    prove -r -j"${JOBS:-4}" $(find t -name '*.t' ! -name critic.t ! -name tidy.t ! -name pod.t | sort)
+
+cover -silent -report compilation -select_re '^lib/' -coverage "$criteria" cover_db
+cover -silent -report json -select_re '^lib/' -coverage "$criteria" cover_db >/dev/null
+
+printf 'Uncoverable annotations in lib/: %s\n' "$(grep -rho '# uncoverable' lib | wc -l | tr -d ' ')"
+
+perl -MJSON::PP -e '
+    my $total = JSON::PP->new->decode( do { local ( @ARGV, $/ ) = "cover_db/cover.json"; <> } )->{summary}{Total};
+    my @criteria = qw(statement branch condition subroutine);
+    my @missing  = grep { ( $total->{$_}{percentage} // 100 ) < 100 } @criteria;
+    printf "Coverage of lib/: %s\n", join ", ", map { sprintf "%s %.2f%%", $_, $total->{$_}{percentage} // 100 } @criteria;
+    exit 0 unless @missing;
+    print STDERR "FAIL: lib/ is not 100% covered for @missing (the uncovered lines are listed above)\n";
+    exit 1;
+'
