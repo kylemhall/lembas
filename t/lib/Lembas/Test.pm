@@ -5,11 +5,14 @@ use parent qw(Exporter);
 use Test::More;
 use Test::Mojo;
 use Mojo::mysql;
+use Mojo::File;
 use Mojo::URL;
 use Digest::SHA qw(sha256_hex);
 use Encode      qw(encode_utf8);
 
-our @EXPORT_OK = qw(capture_stdout create_click create_link create_user login_as oidc_authorize reset_db test_app);
+our @EXPORT_OK = qw(
+    capture_stdout create_click create_database create_link create_user login_as oidc_authorize reset_db test_app
+);
 
 # The environment of the test applications, with the database of the test process
 use constant TEST_ENV => {
@@ -23,6 +26,7 @@ use constant TEST_ENV => {
 };
 
 my ( $server, $database, $database_url, $created_by );
+my @databases;
 my $sequence = 0;
 
 # Importing this module means the test needs a database: without one it is skipped, before Test::NoWarnings is loaded
@@ -104,6 +108,20 @@ sub capture_stdout ($code) {
     return $output;
 }
 
+# Another database, like the one of Polr, with the tables of the SQL file: its URL
+sub create_database ( $name, $sql_file ) {
+    _database_url();
+    my $url   = Mojo::URL->new( $ENV{TEST_ONLINE} );
+    my $other = "${database}_$name";
+    $server->db->query("DROP DATABASE IF EXISTS `$other`");
+    $server->db->query("CREATE DATABASE `$other`");
+    push @databases, $other;
+    my $other_url = $url->path("/$other")->to_unsafe_string;
+    my $db        = Mojo::mysql->new($other_url)->db;
+    $db->query($_) for grep { /\S/ } split /;\s*$/m, Mojo::File::path($sql_file)->slurp;
+    return $other_url;
+}
+
 # A database of its own for every test process, so that prove -j is safe
 sub _database_url {
     return $database_url if $database_url;
@@ -120,7 +138,9 @@ sub _database_url {
 
 END {
     local $? = $?;
-    $server->db->query("DROP DATABASE IF EXISTS `$database`") if $created_by && $created_by == $$;
+    if ( $created_by && $created_by == $$ ) {
+        $server->db->query("DROP DATABASE IF EXISTS `$_`") for $database, @databases;
+    }
 }
 
 1;
@@ -170,6 +190,11 @@ Inserts a link, for a new user unless C<user_id> is given, and returns its row.
 =head2 create_click
 
 Inserts a click, on a new link unless C<link_id> is given, and returns its row. The counter of the link is not changed.
+
+=head2 create_database
+
+Creates another database with the statements of an SQL file, like F<t/fixtures/polr_schema.sql>, and returns its URL.
+It is dropped at the end too.
 
 =head2 capture_stdout
 
