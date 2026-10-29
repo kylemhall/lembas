@@ -9,7 +9,7 @@ use Mojo::URL;
 use Digest::SHA qw(sha256_hex);
 use Encode      qw(encode_utf8);
 
-our @EXPORT_OK = qw(capture_stdout create_link create_user reset_db test_app);
+our @EXPORT_OK = qw(capture_stdout create_click create_link create_user reset_db test_app);
 
 # The environment of the test applications, with the database of the test process
 use constant TEST_ENV => {
@@ -67,6 +67,13 @@ sub create_link ( $t, %columns ) {
             { ending => "e$n", long_url => $long_url, long_url_hash => sha256_hex( encode_utf8($long_url) ), %columns }
         )->last_insert_id;
     return $db->select( links => '*', { id => $id } )->hash;
+}
+
+sub create_click ( $t, %columns ) {
+    $columns{link_id} = create_link($t)->{id} unless exists $columns{link_id};
+    my $db = $t->app->mysql->db;
+    my $id = $db->insert( clicks => \%columns )->last_insert_id;
+    return $db->select( clicks => '*', { id => $id } )->hash;
 }
 
 sub capture_stdout ($code) {
@@ -131,6 +138,10 @@ Inserts a user, the given columns over the defaults, and returns its row.
 =head2 create_link
 
 Inserts a link, for a new user unless C<user_id> is given, and returns its row.
+
+=head2 create_click
+
+Inserts a click, on a new link unless C<link_id> is given, and returns its row. The counter of the link is not changed.
 
 =head2 capture_stdout
 
