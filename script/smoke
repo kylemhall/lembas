@@ -1,0 +1,107 @@
+#!/bin/sh
+# Checks a production image the way production runs it (prefork, not root, SIGQUIT to stop), with a MariaDB and an
+# OpenTelemetry collector of its own, on the default Docker network. Leaves nothing behind.
+#
+#   script/smoke [IMAGE]    the image of make build by default (lembas:local)
+set -eu
+cd "$(dirname "$0")/.."
+image=${1:-lembas:local}
+name=lembas-smoke-$$
+
+cleanup() {
+    docker rm -f "$name-db" "$name-otel" "$name-app" >/dev/null 2>&1 || true
+    docker volume rm "$name-otel" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+fail() {
+    echo "FAIL: $*" >&2
+    docker logs "$name-app" 2>&1 | tail -40 >&2 || true
+    exit 1
+}
+
+address() { docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$1"; }
+
+docker run -d --name "$name-db" -e MARIADB_ROOT_PASSWORD=smoke -e MARIADB_DATABASE=lembas mariadb:11.4 >/dev/null
+docker run -d --name "$name-otel" --user 0:0 -v "$name-otel:/out" \
+    -v "$PWD/deploy/otel-collector/config.yaml:/etc/otelcol/config.yaml:ro" \
+    otel/opentelemetry-collector-contrib:0.161.0 --config=/etc/otelcol/config.yaml >/dev/null
+for _ in $(seq 1 60); do
+    docker exec "$name-db" healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1 && break
+    sleep 1
+done
+
+env_file=$(mktemp)
+cat >"$env_file" <<ENV
+LEMBAS_BASE_URL=http://localhost:8080
+LEMBAS_SHORT_URL=https://short.example
+LEMBAS_DB_URL=mariadb://root@$(address "$name-db")/lembas
+LEMBAS_DB_PASSWORD=smoke
+LEMBAS_SECRETS=smoke-test-secret-0123456789
+LEMBAS_OIDC_CLIENT_ID=smoke
+LEMBAS_OIDC_CLIENT_SECRET=smoke
+LEMBAS_ALLOWED_DOMAIN=example.org
+OTEL_EXPORTER_OTLP_ENDPOINT=http://$(address "$name-otel"):4318
+OTEL_BSP_SCHEDULE_DELAY=1000
+ENV
+run() { docker run --rm --env-file "$env_file" "$image" "$@"; }
+
+run script/lembas migrate >/dev/null || fail 'migrate'
+key=$(run script/lembas eval '
+    my $user_id = app->users->create_imported( { email => q{smoke@example.org} } );
+    app->links->create( { long_url => q{https://example.org/smoke}, user_id => $user_id, ending => q{smoke} } );
+    print app->api_keys->create( $user_id, q{smoke} )->{key};
+') || fail 'seed'
+
+docker run -d --name "$name-app" --env-file "$env_file" "$image" >/dev/null
+rm -f "$env_file"
+[ "$(docker exec "$name-app" id -u)" = 10001 ] || fail 'the application runs as root'
+
+# The requests, from inside the container: Mojo::UserAgent is there, curl is not
+docker exec -e KEY="$key" "$name-app" perl -MMojo::UserAgent -e '
+    my $ua = Mojo::UserAgent->new( max_redirects => 0 );
+    my $up;
+    for ( 1 .. 30 ) { last if $up = eval { $ua->get(q{http://127.0.0.1:8080/health})->result->is_success }; sleep 1 }
+    die "never up\n" unless $up;
+    sub check { my ( $what, $ok ) = @_; die "$what\n" unless $ok; print "ok - $what\n" }
+    my $base = q{http://127.0.0.1:8080};
+    check( q{ready}, $ua->get(qq{$base/ready})->result->code == 200 );
+    my $redirect = $ua->get(qq{$base/smoke})->result;
+    check( q{the short link redirects}, $redirect->code == 302 && $redirect->headers->location eq q{https://example.org/smoke} );
+    check( q{never cached}, $redirect->headers->cache_control eq q{private, no-store} );
+    check( q{unknown links are 404}, $ua->get(qq{$base/nothing})->result->code == 404 );
+    my $created = $ua->post( qq{$base/api/v1/links} => { q{X-Api-Key} => $ENV{KEY} } => json => { long_url => q{https://example.org/api} } )->result;
+    check( q{the REST API shortens}, $created->code == 201 && $created->json->{short_url} =~ m{\Ahttps://short\.example/} );
+    my $polr = $ua->get( qq{$base/api/v2/action/shorten} => form => { key => $ENV{KEY}, url => q{https://example.org/polr} } )->result;
+    check( q{the Polr API shortens}, $polr->code == 200 && $polr->body =~ m{\Ahttps://short\.example/} );
+    check( q{the page is served}, $ua->get(qq{$base/})->result->dom->at(q{a[href="/auth/login"]}) );
+' || fail 'requests'
+
+# SIGQUIT: the workers finish and export what they still have
+started=$(date +%s)
+docker stop -t 30 "$name-app" >/dev/null
+[ "$(docker inspect -f '{{.State.ExitCode}}' "$name-app")" = 0 ] || fail 'the application did not stop cleanly'
+echo "ok - stopped in $(($(date +%s) - started))s"
+
+sleep 3
+docker run --rm --user 0:0 -v "$name-otel:/out" "$image" perl -MMojo::JSON=decode_json -e '
+    my ( @spans, @logs, $service );
+    open my $file, q{<}, q{/out/telemetry.json} or die "no telemetry: $!\n";
+    my $raw = do { local $/; <$file> };
+    for my $line ( split /\n/, $raw ) {
+        my $data = decode_json($line);
+        for my $resource ( @{ $data->{resourceSpans} // [] } ) {
+            ($service) = map { $_->{value}{stringValue} } grep { $_->{key} eq q{service.name} } @{ $resource->{resource}{attributes} };
+            push @spans, map { @{ $_->{spans} } } @{ $resource->{scopeSpans} };
+        }
+        push @logs, map { map { @{ $_->{logRecords} } } @{ $_->{scopeLogs} } } @{ $data->{resourceLogs} // [] };
+    }
+    sub check { my ( $what, $ok ) = @_; die "$what\n" unless $ok; print "ok - $what\n" }
+    check( q{traces of lembas}, ( $service // q{} ) eq q{lembas} );
+    my ($redirect) = grep { $_->{name} eq q{GET /:ending} } @spans;
+    check( q{a span for the redirect}, $redirect );
+    check( q{database spans under it}, grep { ( $_->{parentSpanId} // q{} ) eq $redirect->{spanId} } @spans );
+    check( q{log records of the traces}, grep { ( $_->{traceId} // q{} ) eq $redirect->{traceId} } @logs );
+    check( q{no query string, no client address}, $raw !~ /url\.query|client\.address|example\.org\/polr/ );
+' || fail 'telemetry'
+echo 'Smoke test passed'

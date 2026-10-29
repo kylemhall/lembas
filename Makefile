@@ -6,7 +6,7 @@ CHECK   := $(COMPOSE) run --rm --no-deps test
 JOBS    ?= 4
 IMAGE   ?= lembas:local
 
-.PHONY: help all test coverage cover lint critic tidy-check format dev dev-otel migrate build shell clean
+.PHONY: help all test coverage cover lint critic tidy-check format dev dev-otel migrate build smoke shell clean
 
 help: ## Show this help (default)
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-11s %s\n", $$1, $$2}'
@@ -43,6 +43,9 @@ migrate: ## Apply the migrations to the development database
 
 build: ## Build the production image $(IMAGE)
 	docker build --target app -t $(IMAGE) .
+
+smoke: build ## Run the production image with a MariaDB and a collector, and check it (script/smoke)
+	script/smoke $(IMAGE)
 
 shell: ## Open a shell in the test image
 	$(RUN) bash
