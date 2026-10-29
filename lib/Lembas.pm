@@ -4,6 +4,7 @@ use Mojo::Base 'Mojolicious', -signatures;
 use Mojo::mysql;
 use Time::HiRes qw(gettimeofday tv_interval);
 use Lembas::Config;
+use Lembas::Model::Links;
 use Lembas::Model::Users;
 use Lembas::Telemetry;
 
@@ -33,6 +34,15 @@ has users => sub ($self) {
     return Lembas::Model::Users->new( mysql => $self->mysql, admin_emails => $self->config->{admin_emails} );
 };
 
+has links => sub ($self) {
+    my $config = $self->config;
+    return Lembas::Model::Links->new(
+        mysql         => $self->mysql,
+        short_url     => $config->{short_url},
+        ending_length => $config->{ending_length}
+    );
+};
+
 has telemetry => sub ($self) { Lembas::Telemetry->new( %{ $self->config->{telemetry} }, version => $VERSION ) };
 
 sub startup ($self) {
@@ -53,7 +63,7 @@ sub startup ($self) {
 
 # The models, for the controllers
 sub _helpers ($self) {
-    for my $model (qw(users)) {
+    for my $model (qw(links users)) {
         $self->helper( $model => sub ($c) { $c->app->$model } );
     }
     return;
@@ -123,6 +133,10 @@ The L<Mojo::mysql> connection to the database, with the migrations of F<migratio
 =head2 users
 
 The L<Lembas::Model::Users> of the application, also the C<users> helper.
+
+=head2 links
+
+The L<Lembas::Model::Links> of the application, also the C<links> helper.
 
 =head2 telemetry
 

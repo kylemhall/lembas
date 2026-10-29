@@ -48,8 +48,9 @@ subtest 'database' => sub {
 };
 
 subtest 'helpers' => sub {
-    plan tests => 1;
+    plan tests => 2;
     my $t = Test::Mojo->new( Lembas => { env => \%env } );
     my $c = $t->app->build_controller;
+    isa_ok( $c->links, 'Lembas::Model::Links', 'links' );
     isa_ok( $c->users, 'Lembas::Model::Users', 'users' );
 };
